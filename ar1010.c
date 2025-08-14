@@ -57,7 +57,7 @@
 #define R13_GPIO1	0x0030
 
 // AR1010 R_14 BIT
-#define R14_VOLUME2	0x	// 4bit i don't know location
+#define R14_VOLUME2	0xF000	// 4bit i don't know location
 
 // AR1010 R_15 BIT
 // RDS Register But AR1010 has not RDS function
@@ -84,7 +84,7 @@
 #define AR1010_VOL_STEP0	0x0F
 #define AR1010_VOL_STEP1	0xCF
 #define AR1010_VOL_STEP2	0xDF
-#define AR1010_VOL_STEP3	0xff
+#define AR1010_VOL_STEP3	0xFF
 #define AR1010_VOL_STEP4	0xCB
 #define AR1010_VOL_STEP5	0xDB
 #define AR1010_VOL_STEP6	0xFB
@@ -104,44 +104,44 @@
 // AR1010 Default Register Value
 #define AR1010_W_REG_SIZE	18
 const unsigned short ar1010DefualtregValIn[AR1010_W_REG_SIZE] = {
-	0xFFFB,
-	0x5B15,
-	0xD0B9,
-	0xA010,
-	0x0780,
-	0x28AB,
-	0x6400,
-	0x1EE7,
-	0x7141,
-	0x007D,
-	0x82C6,
-	0x4E55,
-	0x970C,
-	0xB845,
-	0xFC2D,
-	0x8097,
-	0x04A1,
-	0xDF6A
+	0xFFFB, // R0: 1111 1111 1111 1011 xo_en: set, ENABLE: set
+	0x5B15, // R1: 0101 1011 0001 0101 stc_int_en: reset, deemp: set, mono: reset, smute: set, fmute: reset
+	0xD0B9, // R2: 1101 0000 1011 1001 TUEN: reset, CHAN: 0 1011 1001
+	0xA010, // R3: 1010 0000 0001 0000 SEEKUP: set, SEEK: reset, SPACE: set, BAND: 00, VOLUEM: 0000, SEEKTH: 001 0000(16)
+	0x0780, // R4
+	0x28AB, // R5
+	0x6400, // R6
+	0x1EE7, // R7
+	0x7141, // R8
+	0x007D, // R9
+	0x82C6, // R10: 1000 0010 1100 0110 seek_wrap: reset
+	0x4E55, // R11: 0100 1110 0101 0101 hilo_side: reset, hiloctrl_b1: set, hiloctrl_b2: set
+	0x970C, // R12
+	0xB845, // R13: 1011 1000 0100 0101 GPIO3: 00, GPIO2 01, GPIO1 01
+	0xFC2D, // R14: 1111 1100 0010 1101 VOLUME2: 1111
+	0x8097, // R15: 1000 0000 1001 0111 
+	0x04A1, // R16
+	0xDF6A  // R17
 };
 const unsigned short ar1010DefualtregValEx[AR1010_W_REG_SIZE] = {
-	0xFF7B,
-	0x5B15,
-	0xD0B9,
-	0xA010,
-	0x0780,
-	0x28AB,
-	0x6400,
-	0x1EE7,
-	0x7141,
-	0x007D,
-	0x82C6,
-	0x4F55,
-	0x970C,
-	0xB845,
-	0xFC2D,
-	0x8097,
-	0x04A1,
-	0xDF6A
+	0xFF7B, // R0: 1111 1111 0111 1011 xo_en: reset, ENABLE: set
+	0x5B15, // R1: 0101 1011 0001 0101 stc_int_en: reset, deemp: set, mono: reset, smute: set, fmute: reset
+	0xD0B9, // R2: 1101 0000 1011 1001 TUNE: reset, CHAN: 0 1011 1001
+	0xA010, // R3: 1010 0000 0001 0000 SEEKUP: set, SEEK: reset, SPACE: set, BAND: 00, VOLUME: 0000, SEEKTH: 001 0000(16)
+	0x0780, // R4
+	0x28AB, // R5
+	0x6400, // R6
+	0x1EE7, // R7
+	0x7141, // R8
+	0x007D, // R9
+	0x82C6, // R10: 1000 0010 1100 0110 seek_wrap: reset
+	0x4F55, // R11: 0100 1111 0101 0101 hilo_side: reset, hiloctrl_b1: set, hiloctrl_b2: set
+	0x970C, // R12 
+	0xB845, // R13: 1011 1000 0100 0101 GPIO3 00, GPIO2 01, GPIO1 01
+	0xFC2D, // R14: 1111 1100 0010 1101 VOLUME2: 1111
+	0x8097, // R15: 1000 0000 1001 0111
+	0x04A1, // R16
+	0xDF6A  // R17
 };
 
 
