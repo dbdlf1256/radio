@@ -103,7 +103,7 @@
 
 // AR1010 Default Register Value
 #define AR1010_W_REG_SIZE	18
-const unsigned short ar1010DefualtregValIn[AR1010_W_REG_SIZE] = {
+const unsigned short ar1010DefualtRegValIn[AR1010_W_REG_SIZE] = {
 	0xFFFB, // R0: 1111 1111 1111 1011 xo_en: set, ENABLE: set
 	0x5B15, // R1: 0101 1011 0001 0101 stc_int_en: reset, deemp: set, mono: reset, smute: set, fmute: reset
 	0xD0B9, // R2: 1101 0000 1011 1001 TUEN: reset, CHAN: 0 1011 1001
@@ -123,7 +123,7 @@ const unsigned short ar1010DefualtregValIn[AR1010_W_REG_SIZE] = {
 	0x04A1, // R16
 	0xDF6A  // R17
 };
-const unsigned short ar1010DefualtregValEx[AR1010_W_REG_SIZE] = {
+const unsigned short ar1010DefualtRegValEx[AR1010_W_REG_SIZE] = {
 	0xFF7B, // R0: 1111 1111 0111 1011 xo_en: reset, ENABLE: set
 	0x5B15, // R1: 0101 1011 0001 0101 stc_int_en: reset, deemp: set, mono: reset, smute: set, fmute: reset
 	0xD0B9, // R2: 1101 0000 1011 1001 TUNE: reset, CHAN: 0 1011 1001
@@ -144,4 +144,146 @@ const unsigned short ar1010DefualtregValEx[AR1010_W_REG_SIZE] = {
 	0xDF6A  // R17
 };
 
+int xo_en = 0;
+
+int I2cTransmit(unsigned char addrWR, unsigned char reg, unsigned char* data){}
+int I2cWrite(unsigned char addr, unsigned char reg,  unsigned char* data, int dataLen){}
+int I2cRead(unsigned char addr, unsigned char reg, unsigned char* buff, int buffLen){}
+
+int Ar1010Transmit()
+{
+
+	return 0;
+}
+
+int Ar1010Write(unsigned char regAddr, unsigned short* data, int dataLen)
+{
+	/*
+	 * AR1010 Write sequence (i2c protocol?)
+	 * 1. Send Start Signal
+	 * 2. Send Slave Address that include Write bit
+	 * 3. Receive ACK from Slave
+	 * 4. Send Register Address
+	 * 5. Receive ACK from Slave
+	 * 6. Send Data that 1Byte of 2Byte Data of MSB
+	 * 7. Receive ACK from Slave
+	 * 8. Send Data that 1Byte of 2Byte Data of LSB
+	 * 9. Receive ACK froma Slave
+	 * 10. Send Stop Signal
+	 *
+	 * It's Write of I2C Protocol
+	 */
+	if(data == NULL)
+	{
+		printf("data is NULL!\r\n");
+		return -1;
+	}
+
+	I2cWrite(AR1010_ADDR, regAddr, data, dataLen);
+
+	return 0;
+}
+
+int Ar1010Read(unsigned char regAddr, unsigned short* buff, int buffLen)
+{
+	/*
+	 * AR1010 Read sequence (i2c protocol?)
+	 * 1. Send Start Signal
+	 * 2. Send Slave Address that include Write bit
+	 * 3. Receive ACK from Slave
+	 * 4. Send Register Address
+	 * 5. Receive ACK from Slave
+	 * 6. Send Start Signal
+	 * 7. Send Slave Address that include Read bit
+	 * 8. Receive ACK from Slave
+	 * 9. Send clock to Slave
+	 * 10. Receive byte of Register Data that is MSB of 2Byte
+	 * 11. Send ACK to Slave
+	 * 12. Receive byte of Register Data that is LSB of 2Byte
+	 * 13. Send ACK to Slave
+	 * 14. Send Stop Signal
+	 *
+	 * It's Read of I2C Protocol Sequence
+	 */
+	if(buff == NULL)
+	{
+		printf("buff is NULL!\r\n");
+		return -1;
+	}
+
+	unsigned char temp[buffLen] = { 0, };
+
+	I2cRead(AR1010_ADDR, regAddr, temp, buffLen);
+
+	memcpy(buff, temp, buffLen);
+
+	return 0;
+}
+
+int Ar1010Tune()
+{
+	unsigned short reg2 = 0;
+
+	Ar1010Read(R_2, &reg2, sizeof(reg2));
+
+	reg2 &= ~(R2_TUNE);
+
+	Ar1010Write(R_2, &reg2, sizeof(reg2));
+
+	reg2 |= R2_TUNE;
+
+	Ar1010Write(R_2, &reg2, sizeof(reg2));
+
+	return 0;
+}
+
+int Ar1010Init()
+{
+	int res = 0;
+	unsigned short status = 0;
+	char stc = 0;
+
+	// delay for stable
+	delay(1);
+
+	// check the ex_no bit
+	if(xo_en == 1)
+	{
+		// set registers
+		for(int reg = R_0; reg < AR1010_W_REG_SIZE; reg++)
+		{
+			res = Ar1010Write(reg, &ar1010DefualtRegValIn[reg], 2);
+			if(res < 0)
+			{
+				printf("AR1010 Register Initialize Fail!\r\n");
+				return -1;
+			}
+		}
+	}
+	else
+	{
+		// set registers
+		for(int reg = R_0; reg < AR1010_W_REG_SIZE; reg++)
+		{
+			res = Ar1010Write(reg, &ar1010DefualtRegValEx[reg], 2);
+			if(res < 0)
+			{
+				printf("AR1010 Register Initialize Fail!\r\n");
+				return -1;
+			}
+		}	
+	}
+
+	// Check STC Flag
+	do
+	{
+		Ar1010Read(R_STATUS, &status, 2);
+		stc = (status & ~(RSTATUS_STC)) >> 5;
+	}while(stc == 0)
+
+	// TUNING
+	Ar1010Tune();
+
+	return 0;
+}
 
