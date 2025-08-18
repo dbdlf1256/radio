@@ -826,6 +826,8 @@ int SetBand(int select)
 
 	int res = 0;
 	unsigned short r3 = ar1010.mem.r3;
+	double nowFreq = 69.0 + 0.1 * (double)(ar1010.mem.r2 & R2_CHAN);
+	double change = 0;
 
 	r3 &= ~(R3_BAND);
 
@@ -834,12 +836,18 @@ int SetBand(int select)
 		case 0:
 		case 1:
 			r3 |= BAND_US_EU; // Band -> 87.5 ~ 108MHz
+			if(nowFreq < 87.5 || nowFreq > 108.0)
+				change = 87.5;
 			break;
 		case 2:
 			r3 |= BAND_JP; // Band -> 76 ~ 90MHz
+			if(nowFreq < 76.0 || nowFreq > 90)
+				change = 76.0;
 			break;
 		case 3:
 			r3 |= BAND_JP_EX; // Band -> 76 ~ 108MHz
+			if(nowFreq < 76.0 || nowFreq > 108.0)
+				change = 87.5;
 			break;
 		default:
 			printf("Unknown select value!\r\n");
@@ -857,6 +865,17 @@ int SetBand(int select)
 	}
 
 	ar1010.mem.r3 = r3;
+
+	if(change != 0)
+	{
+		res = SetChannel(change);
+		if(res < 0)
+		{
+			printf("Set Channel fail in SetBand Function!\r\n");
+			sem_post(&ar1010_sem);
+			return res;
+		}
+	}
 
 	sem_post(&ar1010_sem);
 
