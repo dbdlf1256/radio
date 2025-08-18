@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <string.h>
+#include <semaphore.h>
 
 // AR1010 Slave Address
 #define AR1010_ADDR	0x10
@@ -22,7 +24,7 @@
 
 // AR1010 R_0 BIT
 #define R0_xo_en	0x0030
-#define R0_ENABLE	0x0000
+#define R0_ENABLE	0x0001
 
 // AR1010 R_1 BIT
 #define R1_stc_int_en	0x0020
@@ -103,6 +105,8 @@
 
 // AR1010 Default Register Value
 #define AR1010_W_REG_SIZE	18
+
+#define MAX_TIMEOUT	15000
 const unsigned short ar1010DefualtRegValIn[AR1010_W_REG_SIZE] = {
 	0xFFFB, // R0: 1111 1111 1111 1011 xo_en: set, ENABLE: set
 	0x5B15, // R1: 0101 1011 0001 0101 stc_int_en: reset, deemp: set, mono: reset, smute: set, fmute: reset
@@ -188,6 +192,8 @@ typedef union _ar1010R_t
 
 ar1010R_t ar1010;
 
+sem_t ar1010_sem;
+
 int I2cTransmit(unsigned char addrWR, unsigned char reg, unsigned char* data){}
 int I2cWrite(unsigned char addr, unsigned char reg,  unsigned char* data, int dataLen){}
 int I2cRead(unsigned char addr, unsigned char reg, unsigned char* buff, int buffLen){}
@@ -263,8 +269,12 @@ int Ar1010Read(unsigned char regAddr/*, unsigned short* buff, int buffLen*/)
 // R_2 functions
 int Ar1010Tune()
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	unsigned short r2 = ar1010.mem.r2;
+	char stc = 0;
+	int timeOut = 0;
 
 	// Ar1010Read(R_2/*, &reg2, sizeof(reg2)*/);
 
@@ -274,6 +284,7 @@ int Ar1010Tune()
 	if(res < 0)
 	{
 		printf("Reset TUNE bit fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
@@ -284,12 +295,29 @@ int Ar1010Tune()
 	if(res < 0)
 	{
 		printf("Set TUNE bit fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.mem.r2 = r2;
 
-	return 0;
+	do
+	{
+		if(timeout > MAX_TIMEOUT)
+		{
+			printf("Tune STC Timeout!\r\n");
+			res = -1;
+			break;
+		}
+
+		Ar1010Read(R_STATUS);
+		stc = ar1010.mem.rstatus & RSTATUS_STC ? 1 : 0;
+
+		timeout++;
+	}while(stc == 0);
+
+	sem_post(&ar1010_sem);
+	return res;
 }
 
 // AR1010 initialize sequence
@@ -298,7 +326,10 @@ int Ar1010Init()
 	int res = 0;
 	// unsigned short status = 0;
 	char stc = 0;
+	int timeout = 0;
 
+	sem_init(&ar1010_sem, 0, 1);
+	sem_wait(&ar1010_sem);
 	memset(&ar1010, 0, sizeof(ar1010R_t));
 
 	// delay for stable
@@ -314,7 +345,9 @@ int Ar1010Init()
 			if(res < 0)
 			{
 				printf("AR1010 Register Initialize Fail!\r\n");
-				return -1;
+				sem_post(&ar1010_sem);
+				res = -1;
+				return res;
 			}
 			ar1010.wbuff[reg] = ar1010DefualtRegValIn[reg];
 		}
@@ -328,7 +361,9 @@ int Ar1010Init()
 			if(res < 0)
 			{
 				printf("AR1010 Register Initialize Fail!\r\n");
-				return -1;
+				sem_post(&ar1010_sem);
+				res = -1;
+				return res;
 			}
 			ar1010.wbuff[reg] = ar1010DefualtRegValEx[reg];
 		}	
@@ -337,48 +372,69 @@ int Ar1010Init()
 	// Check STC Flag
 	do
 	{
+		if(timeout > MAX_TIMEOUT)
+		{
+			printf("AR1010 Initailize STC Timeout!\r\n");
+			res = -1;
+			break;
+		}
+
 		Ar1010Read(R_STATUS/*, &status, 2*/);
-		stc = (ar1010.mem.rstatus & ~(RSTATUS_STC)) >> 5;
+		stc = (ar1010.mem.rstatus & RSTATUS_STC) ? 1 : 0;
+
+		break;
 	}while(stc == 0);
 
 	// TUNING
-	Ar1010Tune();
+	// semaphore problem!!
+	if(res >= 0)
+	{
+		sem_post(&ar1010_sem);
+		Ar1010Tune();
+		sem_wait(&ar1010_sem);
+	}
+
+	sem_post(&ar1010_sem);
 
 	return 0;
 }
 
 // R_0 functions
-// 세마포어 걸어야 하나?
 int SetXoEnable(int enable)
 {
+	sem_wait(&ar1010_sem);
+
 	int res = 0;
 	unsigned short r0 = ar1010.mem.r0;
 
 	if (enable)
 	{
-		r0 |= R0_xo_en; // using external reference clock
+		r0 |= R0_xo_en; // using internal crystal oscillator
 	}
 	else
 	{
-		r0 &= ~(R0_xo_en); // using internal crystal osillator
+		r0 &= ~(R0_xo_en); // using external reference clock
 	}
 
 	res = Ar1010Write(R_0, &r0, 2);
 	if(res < 0)
 	{
 		printf("xo_en config fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 	
 	ar1010.mem.r0 = r0;
 
+	sem_post(&ar1010_sem);
 	return res;
 }
 
-// 세마포어 걸어야 하나?
-int SetSlip(int enable)
+int SetSleep(int enable)
 {
-	char res = 0;
+	sem_wati(&ar1010_sem);
+
+	int res = 0;
 	unsigned short r0 = ar1010.mem.r0;
 
 	if (enable)
@@ -394,19 +450,23 @@ int SetSlip(int enable)
 	if(res < 0)
 	{
 		printf("Slip mode config fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 	
 	ar1010.mem.r0 = r0;
 
+	sem_post(&ar1010_sem);
+
 	return res;
 }
 
 // R1
-// 세마포어 걸어야 하나?
 int setStcIntEn(int enable)
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	unsigned short r1 = ar1010.mem.r1;
 
 	if(enable)
@@ -422,18 +482,22 @@ int setStcIntEn(int enable)
 	if(res < 0)
 	{
 		printf("set stc_int_en fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.mem.r1 = r1;
 
+	sem_post(&ar1010_sem);
+
 	return res;
 }
 
-// 세마포어 걸어야 하나?
 int SetDeemp(int select)
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	unsigned short r1 = ar1010.mem.r1;
 
 	switch(select)
@@ -447,6 +511,7 @@ int SetDeemp(int select)
 		default:
 			printf("Unknown select value!\r\n");
 			res = -1;
+			sem_post(&ar1010_sem);
 			return res;
 	}
 
@@ -454,18 +519,22 @@ int SetDeemp(int select)
 	if(res < 0)
 	{
 		printf("set deemp fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.mem.r1 = r1;
-	
+
+	sem_post(&ar1010_sem);
+
 	return res;
 }
 
-// 세마포어 걸어야 하나?
 int SetMono(int enable)
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	unsigned short r1 = ar1010.mem.r1;
 
 	if(enable)
@@ -481,18 +550,22 @@ int SetMono(int enable)
 	if(res < 0)
 	{
 		printf("Set mono fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.mem.r1 = r1;
 
+	sem_post(&ar1010_sem);
+
 	return res;
 }
 
-// 세마포어 걸어야 하나?
 int SetSmute(int enable)
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	unsigned short r1 = ar1010.mem.r1;
 
 	if(enable)
@@ -508,18 +581,22 @@ int SetSmute(int enable)
 	if(res < 0)
 	{
 		printf("Set mono fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.mem.r1 = r1;
 
+	sem_post(&ar1010_sem);
+
 	return res;
 }
 
-// 세마포어 걸어야 하나?
 int SetHmute(int enable)
 {
-	char res = 0;
+	sem_wati(&ar1010_sem);
+
+	int res = 0;
 	unsigned short r1 = ar1010.mem.r1;
 
 	if(enable)
@@ -535,43 +612,88 @@ int SetHmute(int enable)
 	if(res < 0)
 	{
 		printf("Set mono fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.mem.r1 = r1;
 
+	sem_post(&ar1010_sem);
+
 	return res;
 }
 
 // R_2 functions
-// 세마포어 걸어야 하나?
 // int Ar1010Tuning(double freq)
+#define BAND_US_EU	0x0000
+#define BAND_JP		0x1000
+#define BAND_JP_EX	0x1800
 int SetChannel(double freq)
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	// BAND 값에 따라 허용 범위가 달라져야 함 (수정 필요)
-	if(freq < 87.5)
+	unsigned short band = ar1010.mem.r3 & R3_BAND;
+	switch(band)
 	{
-		freq = 87.5;
+		case BAND_US_EU:
+			if(freq < 87.5)
+			{
+				freq = 87.5;
+			}
+			else if(freq > 108.0)
+			{
+				freq = 108.0;
+			}
+			else
+			{}
+			break;
+		case BAND_JP:
+			if(freq < 76.0)
+			{
+				freq = 76.0;
+			}
+			else if(freq > 90.0)
+			{
+				freq = 90.0;
+			}
+			else
+			{}
+			break;
+		case BAND_JP_EX:
+			if(freq < 76.0)
+			{
+				freq = 76.0;
+			}
+			else if(freq > 108.0)
+			{
+				freq = 108.0;
+			}
+			else
+			{}
+			break;
+		default:
+			printf("Band Error in SetChannel Function!\r\n");
+			sem_post(&ar1010_sem);
+			res = -1;
+			return res;
 	}
-	else if(freq > 108.0)
-	{
-		freq = 108.0;
-	}
-	else
-	{}
 
 	unsigned short chan = (freq - 69) * 10;
 
-	res = Ar1010Write(R_2, &chan, sizeof(chan));
+	res = Ar1010Write(R_2, &chan, 2);
 	if(res < 0)
 	{
 		printf("Set Channel fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.mem.r2 &= ~(R2_CHAN);
 	ar1010.mem.r2 |= chan;
+
+	sem_post(&ar1010_sem);
 
 	Ar1010Tune();
 
@@ -579,10 +701,11 @@ int SetChannel(double freq)
 }
 
 //R_3 functions
-// 세마포어 걸어야 하나?
 int SetSeekUpDown(int upDown)
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	unsigned short r3 = ar1010.mem.r3;
 
 	if(upDown)
@@ -591,30 +714,37 @@ int SetSeekUpDown(int upDown)
 	}
 	else
 	{
-		r3 &= !(R3_SEEKUP); // Seek Down
+		r3 &= ~(R3_SEEKUP); // Seek Down
 	}
 
 	res = Ar1010Write(R_3, &r3, 2);
 	if(res < 0)
 	{
 		printf("Set Seek Up/Down fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
+	
+	sem_post(&ar1010_sem);
 
 	return res;
 }
 
-// 세마포어 걸어야 하나?
 int Ar1010Seek()
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	unsigned short r3 = ar1010.mem.r3;
+	char stc = 0;
+	int timeout = 0;
 
 	r3 &= ~(R3_SEEK);
 	res = Ar1010Write(R_3, &r3, 2);
 	if(res < 0)
 	{
 		printf("fail to Reset SEEK bit!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 	
@@ -625,20 +755,39 @@ int Ar1010Seek()
 	if(res < 0)
 	{
 		printf("fail to Set SEEK bit!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 	
 	printf("Set SEEK!\r\n");
 
-	ar1010.mem.r3 = r3;
+	do
+	{
+		if(timeout > MAX_TIMEOUT)
+		{
+			printf("Seek STC Timeout!\r\n");
+			res = -1;
+			break;
+		}
+		
+		Ar1010Read(R_STATUS);
+		stc = ar1010.mem.rstatus & RSTATUS_STC ? 1 : 0;
+		
+		timeout++;
+	} while(stc == 0);
 
-	return 0;
+	ar1010.mem.r3 = r3;
+	
+	sem_post(&ar1010_sem);
+
+	return res;
 }
 
-// 세마포어 걸어야 하나?
 int SetSpace(int select)
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	unsigned short r3 = ar1010.mem.r3;
 
 	switch(select)
@@ -652,6 +801,7 @@ int SetSpace(int select)
 		default:
 			printf("Unknown Space Value!\r\n");
 			res = -1;
+			sem_post(&ar1010_sem);
 			return res;
 	}
 
@@ -659,21 +809,22 @@ int SetSpace(int select)
 	if(res < 0)
 	{
 		printf("Set Space value fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.mem.r3 = r3;
 
+	sem_post(&ar1010_sem);
+
 	return res;
 }
 
-#define BAND_US_EU	0x0000
-#define BAND_JP		0x1000
-#define BAND_JP_EX	0x1800
-// 세마포어 걸어야 하나?
 int SetBand(int select)
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	unsigned short r3 = ar1010.mem.r3;
 
 	r3 &= ~(R3_BAND);
@@ -693,6 +844,7 @@ int SetBand(int select)
 		default:
 			printf("Unknown select value!\r\n");
 			res = -1;
+			sem_post(&ar1010_sem);
 			return res;
 	}
 
@@ -700,23 +852,25 @@ int SetBand(int select)
 	if(res < 0)
 	{
 		printf("Set Band fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.mem.r3 = r3;
 
+	sem_post(&ar1010_sem);
+
 	return res;
 }
 
-// VOLUME은 2개의 레지스터의 각 BIT를 설정해줘야 하기 때문에 나중에 해당 함수 구현 예정(수정 필요)
-
 #define SEEKTH_MAX	127
 
-// 세마포어가 필요 한가?
 // 입력 신호의 세기가 여기서 설정한 값 이상이어야 SEEK 동작을 수행한다.
 int SetSeekThreshold(unsigned short threshold)
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	unsigned short r3 = ar1010.mem.r3;
 
 	r3 &= ~(R3_SEEKTH);
@@ -732,10 +886,13 @@ int SetSeekThreshold(unsigned short threshold)
 	if(res < 0)
 	{
 		printf("Set Seek Threshold fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.mem.r3 = r3;
+
+	sem_post(&ar1010_sem);
 
 	return res;
 }
@@ -743,7 +900,9 @@ int SetSeekThreshold(unsigned short threshold)
 // R_10 function
 int SetSeekWrap(int enable)
 {
-	char res = 0;
+	sem_wait(&sr1010_sem);
+
+	int res = 0;
 	unsigned short r10 = ar1010.mem.r10;
 
 	if(enable)
@@ -759,10 +918,13 @@ int SetSeekWrap(int enable)
 	if(res < 0)
 	{
 		printf("Set Seek Wrap fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.mem.r10 = r10;
+
+	sem_post(&ar1010_sem);
 
 	return res;
 }
@@ -770,7 +932,9 @@ int SetSeekWrap(int enable)
 // R_11 functions
 int SetHiloSide(int side)
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	unsigned short r11 = ar1010.mem.r11;
 
 	if(side)
@@ -786,10 +950,13 @@ int SetHiloSide(int side)
 	if(res < 0)
 	{
 		printf("Set High/Low Side fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.mem.r11 = r11;
+	
+	sem_post(&ar1010_sem);
 
 	return res;
 }
@@ -813,12 +980,15 @@ int SetHiloSide(int side)
 // R_13 function
 int SetGpio(unsigned char port, int func)
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 
 	if(port > AR1010_GPIO3)
 	{
 		printf("Unknown GPIO Port!\r\n");
 		res = -1;
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
@@ -843,6 +1013,7 @@ int SetGpio(unsigned char port, int func)
 		default:
 			printf("Unknown select value!\r\n");
 			res = -1;
+			sem_post(&ar1010_sem);
 			return res;
 	}
 
@@ -850,22 +1021,26 @@ int SetGpio(unsigned char port, int func)
 	if(res < 0)
 	{
 		printf("Select GPIO3 function fail!\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.mem.r13 = r13;
 
+	sem_post(&ar1010_sem);
+
 	return res;
 }
 
-#define AR1010_SET_VOLUME1(vol)	((vol) & 0x0F)
-#define AR1010_SET_VOLUME2(vol)	(((vol) & 0xF0) << 4)
+#define AR1010_SET_VOLUME1(vol)	(((unsigned short)((vol) & 0x0F)) << 7)
+#define AR1010_SET_VOLUME2(vol)	(((unsigned short)((vol) & 0xF0)) << 8)
 
 // R_14 function
-// 여기다가 VOLUME 설정 함수를 구현하자.(수정 필요)
 int SetVolume(unsigned short volume)
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	unsigned short r3 = ar1010.mem.r3;
 	unsigned short r14 = ar1010.mem.r14;
 
@@ -879,6 +1054,7 @@ int SetVolume(unsigned short volume)
 	if(res < 0)
 	{
 		printf("Set Volume1 fail\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 	
@@ -888,10 +1064,13 @@ int SetVolume(unsigned short volume)
 	if(res < 0)
 	{
 		printf("Set Volume2 fail\r\n");
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.mem.r14 = r14;
+
+	sem_post(&ar1010_sem);
 
 	return res;
 }
@@ -899,17 +1078,22 @@ int SetVolume(unsigned short volume)
 // Set AR1010 specific register
 int SetAr1010Reg(unsigned char reg, unsigned short val)
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	// unsigned short data = val;
 	
 	res = Ar1010Write(reg, &val, 2);
 	if(res < 0)
 	{
 		printf("Set 0x%02X Register fail!\r\n", reg);
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.wbuff[reg] = val;
+
+	sem_post(&ar1010_sem);
 
 	return res;
 }
@@ -917,7 +1101,9 @@ int SetAr1010Reg(unsigned char reg, unsigned short val)
 // Set AR1010 specific bit of specific register
 int SetAr1010Bit(unsigned char reg, unsigned char bit, unsigned short val)
 {
-	char res = 0;
+	sem_wait(&ar1010_sem);
+
+	int res = 0;
 	unsigned short rx = ar1010.wbuff[reg];
 
 	rx &= ~(bit);
@@ -926,11 +1112,14 @@ int SetAr1010Bit(unsigned char reg, unsigned char bit, unsigned short val)
 	res = Ar1010Write(reg, &rx, 2);
 	if(res < 0)
 	{
-		printf("Set 0x%04X Bit of 0x%02X Register fail!\r\n");
+		printf("Set 0x%04X Bit of 0x%02X Register fail!\r\n", bit, reg);
+		sem_post(&ar1010_sem);
 		return res;
 	}
 
 	ar1010.wbuff[reg] = rx;
+
+	sem_post(&ar1010_sem);
 
 	return res;
 }
