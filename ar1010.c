@@ -274,7 +274,7 @@ int Ar1010Tune()
 	int res = 0;
 	unsigned short r2 = ar1010.mem.r2;
 	char stc = 0;
-	int timeOut = 0;
+	int timeout = 0;
 
 	// Ar1010Read(R_2/*, &reg2, sizeof(reg2)*/);
 
@@ -432,7 +432,7 @@ int SetXoEnable(int enable)
 
 int SetSleep(int enable)
 {
-	sem_wati(&ar1010_sem);
+	sem_wait(&ar1010_sem);
 
 	int res = 0;
 	unsigned short r0 = ar1010.mem.r0;
@@ -594,7 +594,7 @@ int SetSmute(int enable)
 
 int SetHmute(int enable)
 {
-	sem_wati(&ar1010_sem);
+	sem_wait(&ar1010_sem);
 
 	int res = 0;
 	unsigned short r1 = ar1010.mem.r1;
@@ -919,7 +919,7 @@ int SetSeekThreshold(unsigned short threshold)
 // R_10 function
 int SetSeekWrap(int enable)
 {
-	sem_wait(&sr1010_sem);
+	sem_wait(&ar1010_sem);
 
 	int res = 0;
 	unsigned short r10 = ar1010.mem.r10;
