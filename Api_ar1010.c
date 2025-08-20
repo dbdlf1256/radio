@@ -57,8 +57,11 @@ int iic_write(unsigned char slaveAddress, unsigned char *writeData,unsigned int 
 
 // AR1010 R_3 BIT
 #define AR1010_R3_SEEKUP_MASK	0x8000
+#define AR1010_R3_SEEKUP_SHIFT	15
 #define AR1010_R3_SEEK_MASK	0x4000
+#define AR1010_R3_SEEK_SHIFT	14
 #define AR1010_R3_SPACE_MASK	0x2000
+#define AR1010_R3_SPACE_SHIFT	13
 #define AR1010_R3_BAND_MASK	0x1800
 #define AR1010_R3_BAND_SHIFT	11
 #define AR1010_R3_VOLUME_MASK	0x0780
@@ -88,7 +91,7 @@ int iic_write(unsigned char slaveAddress, unsigned char *writeData,unsigned int 
 
 // AR1010 R_14 BIT
 #define AR1010_R14_VOLUME2_MASK		0xF000
-#define AR1010_R14_VOLUME2_SHIFT	12
+#define AR1010_R14_VOLUME2_SHIFT	8
 
 
 // AR1010 R_SSI BIT
@@ -605,6 +608,458 @@ int Ar1010TuneEnable(uint16_t enable)
 	ret = Ar1010Write(AR1010_REG2, &r2, 1);
 	if(ret < 0)
 		printf("Ar1010TuneEnable function fail! value: %d\r\n", enable);
+
+	return ret;
+}
+
+#define AR1010_FREQ2CHAN(f)	(uint16_t)(((f) - 69) * 10)
+
+int Ar1010CheckBandFreq(uint16_t freq, uint16_t band)
+{
+	int ret = AR1010_OK;
+	uint16_t maxFreq = 0;
+	uint16_t minFreq = 0;
+
+	// uint16_t r3 = GetAr1010Reg(AR1010_REG3);
+	// r3 &= AR1010_R3_BAND_MASK;
+
+	switch(band)
+	{
+		case BAND_US_EU:
+			maxFreq = US_EU_MAX_FREQ;
+			minFreq = US_EU_MIN_FREQ;
+			break;
+		case BAND_JP:
+			maxFreq = JP_MAX_FREQ;
+			minFreq = JP_MIN_FREQ;
+			break;
+		case BAND_JP_EX:
+			maxFreq = JP_EX_MAX_FREQ;
+			minFreq = JP_EX_MIN_FREQ;
+			break;
+		default:
+			printf("AR1010 Unknown BAND value is set\r\n");
+			ret = AR1010_EINVAL;
+			return ret;
+	}
+
+	if(freq < minFreq || freq > maxFreq)
+	{
+		printf("Invalid Frequency!\r\n");
+		ret = AR1010_EINVAL;
+	}
+
+	return ret;
+}
+
+int Ar1010ChannelSet(uint16_t chan)
+{
+	int ret = AR1010_OK;
+	
+	uint16_t r2 = GetAr1010Reg(AR1010_REG2);
+	r2 &= ~AR1010_R2_CHAN_MASK;
+	r2 |= chan;
+
+	ret = Ar1010Write(AR1010_REG2, &r2, 1);
+	if(ret < 0)
+		printf("Ar1010ChannelSet function fail! value: 0x%03X\r\n", chan);
+
+	return ret;
+}
+
+int Ar1010SeekUpDown(uint16_t upDown)
+{
+	int ret = AR1010_OK;
+
+	uint16_t r3 = GetAr1010Reg(AR1010_REG3);
+	r3 &= ~AR1010_R3_SEEKUP_MASK;
+	r3 |= upDown << AR1010_R3_SEEKUP_SHIFT;
+
+	ret = Ar1010Write(AR1010_REG3, &r3, 1);
+	if(ret < 0)
+		printf("Ar1010SeekUpDown function fail! value: %d\r\n", upDown);
+
+	return ret;
+}
+
+int Ar1010SeekEnable(uint16_t enable)
+{
+	int ret = AR1010_OK;
+
+	uint16_t r3 = GetAr1010Reg(AR1010_REG3);
+	r3 &= ~AR1010_R3_SEEK_MASK;
+	r3 |= enable << AR1010_R3_SEEK_SHIFT;
+
+	ret = Ar1010Write(AR1010_REG3, &r3, 1);
+	if(ret < 0)
+		printf("Ar1010SeekEnable function fail! value: %d\r\n", enable);
+
+	return ret;
+}
+
+int Ar1010SpaceSet(uint16_t set)
+{
+	int ret = AR1010_OK;
+
+	uint16_t r3 = GetAr1010Reg(AR1010_REG3);
+	r3 &= ~AR1010_R3_SEEKUP_MASK;
+	r3 |= set << AR1010_R3_SEEKUP_SHIFT;
+
+	ret = Ar1010Wrtie(AR1010_REG3, &r3, 1);
+	if(ret < 0)
+		printf("Ar1010SpaceSet function fail! value: %d\r\n");
+
+	return ret;
+}
+
+int Ar1010BandSelect(uint16_t band)
+{
+	int ret = AR1010_OK;
+
+	uint16_t r3 = GetAr1010Reg(AR1010_REG3);
+	r3 &= ~AR1010_R3_BAND_MASK;
+	r3 |= band << AR1010_R3_BAND_SHIFT;
+
+	ret = Ar1010Write(AR1010_REG3, &r3, 1);
+	if(ret < 0)
+		printf("Ar1010BandSelect function fail! value: 0x%04X\r\n", band);
+
+	return ret;
+}
+
+int Ar1010VolumeSet(uint16_t vol)
+{
+	int ret = AR1010_REG3;
+
+	uint16_t r3 = GetAr1010Reg(AR1010_REG3);
+	r3 &= ~AR1010_R3_VOLUME_MASK;
+	r3 |= vol << AR1010_R3_VOLUME_SHIFT;
+
+	ret = Ar1010Write(AR1010_REG3, &r3, 1);
+	if(ret < 0)
+		printf("Ar1010VolumeSet function fail! value: 0x%03X\r\n", vol);
+
+	return ret;
+}
+
+int Ar1010SeekThSet(uint16_t th)
+{
+	int ret = AR1010_OK;
+
+	uint16_t r3 = GetAr1010Reg(AR1010_REG3);
+	r3 &= ~AR1010_R3_SEEKTH_MASK;
+	r3 |= th;
+
+	ret = Ar1010Write(AR1010_REG3, &r3, 1);
+	if(ret < 0)
+		printf("Ar1010SeekThSet function fail! value: 0x%02X\r\n", th);
+
+	return ret;
+}
+
+int Ar1010SeekWrapEnable(uint16_t enable)
+{
+	int ret = AR1010_OK;
+
+	uint16_t r10 = GetAr1010Reg(AR1010_REG10);
+	r10 &= ~AR1010_R10_SEEK_WRAP_MASK;
+	r10 |= enable << AR1010_R10_SEEK_WRAP_SHIFT;
+
+	ret = Ar1010Write(AR1010_REG10, &r10, 1);
+	if(ret < 0)
+		printf("Ar1010SeekWrapEnable function fail! value: %d\r\n", enable);
+
+	return ret;
+}
+
+int Ar1010HighSideInjection()
+{
+	int ret = AR1010_OK;
+
+	uint16_t r11 = GetAr1010Reg(AR1010_REG11);
+	r11 |= AR1010_R10_HILO_SIDE_MASK | AR1010_R10_HILOCTRL_B1_MASK | AR1010_R10_HILOCTRL_B2_MASK;
+
+	ret = Ar1010Write(AR1010_REG11, &r11, 1);
+	if(ret < 0)
+		printf("Ar1010HighSideInjection function fail!\r\n");
+
+	return ret;
+}
+
+int Ar1010LowSideInjection()
+{
+	int ret = AR1010_OK;
+
+	uint16_t r11 = GetAr1010Reg(AR1010_REG11);
+	r11 &= ~(AR1010_R11_HILO_SIDE_MASK | AR1010_R11_HILOCTRL_B1_MASK | AR1010_R11_HILOCTRL_B2_MASK);
+
+	ret = Ar1010Write(AR1010_REG11, &r11, 1);
+	if(ret < 0)
+		printf("Ar1010LowSideInjection function fail!\r\n");
+
+	return ret;
+}
+
+#define AR1010_GPIO3	2
+#define AR1010_GPIO2	1
+#define AR1010_GPIO1	0
+
+#define AR1010_GPIO_MASK(port)	(0x0003 << (2 * (port)))
+
+#define GPIO_DISABLE		0X0000
+#define GPIO_FUNC_1(port)	(0x0001 << (2 * (port)))
+#define GPIO_LOW(port)		(0x0002 << (2 * (port)))
+#define GPIO_HIGH(port)		(0x0003 << (2 * (port)))
+
+// #define GPIO3_STEREO_IND	0x0010
+// #define GPIO2_INTERRUPT		0x0040
+
+// R13 GPIO SETTING
+int Ar1010GpioSet(uint8_t port, uint32_t func)
+{
+	int ret = AR1010_OK;
+
+	if(port > AR1010_GPIO3)
+	{
+		printf("Unknown GPIO Port!\r\n");
+		ret = AR1010_EINVAL;
+		return ret;
+	}
+
+	unsigned short r13 = GetAr1010Reg(AR1010_REG13);
+
+	r13 &= ~(AR1010_GPIO_MASK(port));
+
+	switch(func)
+	{
+		case 0:
+			r13 |= GPIO_DISABLE;
+			break;
+		case 1:
+			r13 |= GPIO_FUNC_1(port);
+			break;
+		case 2:
+			r13 |= GPIO_LOW(port);
+			break;
+		case 3:
+			r13 |= GPIO_HIGH(port);
+			break;
+		default:
+			printf("Unknown select value!\r\n");
+			ret = AR1010_EINVAL;
+			return res;
+	}
+
+	ret = Ar1010Write(AR1010_REG14, &r13, 1);
+	if(ret < 0)
+	{
+		printf("Select GPIO3 function fail!\r\n");
+		return ret;
+	}
+
+	return ret;
+}
+
+
+int Ar1010Volume2Set(uint16_t vol2)
+{
+	int ret = AR1010_OK;
+
+	uint16_t r14 = GetAr1010Reg(AR1010_REG14);
+	r14 &= ~AR1010_R14_VOLUME2_MASK;
+	r14 |= vol2 << AR1010_R14_VOLUME2_SHIFT;
+
+	ret = Ar1010Write(AR1010_REG14, &r14, 1);
+	if(ret < 0)
+		printf("Ar1010Volume2Set functio fail! value: 0x%04X\r\n");
+
+	return ret;
+}
+
+int GetAr1010VolumeStep()
+{
+	int ret = 0;
+
+	uint16_t volume = 0;
+
+	uint16_t rx = GetAr1010Reg(AR1010_REG3);
+	rx &= AR1010_R3_VOLUME_MASK;
+	rx >>= AR1010_R3_VOLUME_SHIFT;
+	volume |= rx;
+
+	rx = GetAr1010Reg(AR1010_REG14);
+	rx &= AR1010_R14_VOLUME2_MASK;
+	rx >>= AR1010_R14_VOLUME2_SHIFT;
+	volume |= rx;
+
+	switch(volume)
+	{
+		case AR1010_VOLUME_STEP0:
+			ret = 0;
+			break;
+		case AR1010_VOLUME_STEP1:
+			ret = 1;
+			break;
+		case AR1010_VOLUME_STEP2:
+			ret = 2;
+			break;
+		case AR1010_VOLUME_STEP3:
+			ret = 3;
+			break;
+		case AR1010_VOLUME_STEP4:
+			ret = 4;
+			break;
+		case AR1010_VOLUME_STEP5:
+			ret = 5;
+			break;
+		case AR1010_VOLUME_STEP6:
+			ret = 6;
+			break;
+		case AR1010_VOLUME_STEP7:
+			ret = 7;
+			break;
+		case AR1010_VOLUME_STEP8:
+			ret = 8;
+			break;
+		case AR1010_VOLUME_STEP9:
+			ret = 9;
+			break;
+		case AR1010_VOLUME_STEP10:
+			ret = 10;
+			break;
+		case AR1010_VOLUME_STEP11:
+			ret = 11;
+			break;
+		case AR1010_VOLUME_STEP12:
+			ret = 12;
+			break;
+		case AR1010_VOLUME_STEP13:
+			ret = 13;
+			break;
+		case AR1010_VOLUME_STEP14:
+			ret = 14;
+			break;
+		case AR1010_VOLUME_STEP15:
+			ret = 15;
+			break;
+		case AR1010_VOLUME_STEP16:
+			ret = 16;
+			break;
+		case AR1010_VOLUME_STEP17:
+			ret = 17;
+			break;
+		case AR1010_VOLUME_STEP18:
+			ret = 18;
+			break;
+		default:
+			ret = AR1010_EINVAL;
+			break;
+	}
+
+	return ret;
+}
+
+// R3, R14 VOLUME SETTING
+int SetAr1010Volume(uint16_t stepVal)
+{
+	int ret = AR1010_OK;
+
+	uint16_t vol = stepVal & 0x000F;
+	uint16_t vol2 = stepVal & 0x00F0;
+	
+	ret = Ar1010VolumeSet(vol);
+	if(ret < 0)
+	{
+		printf("SetAr1010Volume function step1 fail!\r\n");
+		return ret;
+	}
+
+	ret = Ar1010Volume2Set(vol2);
+	if(ret < 0)
+	{
+		printf("SetAr1010Volume function step1 fail!\r\n");
+		return ret;
+	}
+	
+	int volStep = GetAr1010VolumeStep();
+	printf("Now AR1010 Volume step: %d", volStep);
+
+	return ret;
+}
+
+int SetAr1010VolumeStep(int step)
+{
+	int ret = AR1010_OK;
+	uint16_t volStep = 0;
+
+	switch(step)
+	{
+		case 0:
+			volStep = AR1010_VOLUME_STEP0;
+			break;
+		case 1:
+			volStep = AR1010_VOLUME_STEP1;
+			break;
+		case 2:
+			volStep = AR1010_VOLUME_STEP2;
+			break;
+		case 3:
+			volStep = AR1010_VOLUME_STEP3;
+			break;
+		case 4:
+			volStep = AR1010_VOLUME_STEP4;
+			break;
+		case 5:
+			volStep = AR1010_VOLUME_STEP5;
+			break;
+		case 6:
+			volStep = AR1010_VOLUME_STEP6;
+			break;
+		case 7:
+			volStep = AR1010_VOLUME_STEP7;
+			break;
+		case 8:
+			volStep = AR1010_VOLUME_STEP8;
+			break;
+		case 9:
+			volStep = AR1010_VOLUME_STEP9;
+			break;
+		case 10:
+			volStep = AR1010_VOLUME_STEP10;
+			break;
+		case 11:
+			volStep = AR1010_VOLUME_STEP11;
+			break;
+		case 12:
+			volStep = AR1010_VOLUME_STEP12;
+			break;
+		case 13:
+			volStep = AR1010_VOLUME_STEP13;
+			break;
+		case 14:
+			volStep = AR1010_VOLUME_STEP14;
+			break;
+		case 15:
+			volStep = AR1010_VOLUME_STEP15;
+			break;
+		case 16:
+			volStep = AR1010_VOLUME_STEP16;
+			break;
+		case 17:
+			volStep = AR1010_VOLUME_STEP17;
+			break;
+		case 18:
+			volStep = AR1010_VOLUME_STEP18;
+			break;
+		default:
+			printf("SetAR1010VoluemStep function Invalid Argument!\r\n");
+			ret = AR1010_EINVAL;
+			return ret;
+	}
+
+	ret = SetAr1010Volume(volStep);
+	if(ret < 0)
+		printf("SetAr1010VolumeStep function fail!\r\n");
 
 	return ret;
 }
