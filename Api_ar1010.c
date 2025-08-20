@@ -1,3 +1,8 @@
+/*
+ * 전체적으로 가독성을 높이기 위해 반복되는 구조는 함수로 만들고 구체화 및 세분화가 필요함
+ * 채널 선택은 상위 코드에서 수행해야 하려나?
+ */
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -28,17 +33,25 @@ int iic_write(unsigned char slaveAddress, unsigned char *writeData,unsigned int 
 
 // AR1010 R_0 BIT
 #define AR1010_R0_XO_EN_MASK	0x0080
+#define AR1010_R0_XO_EN_SHIFT	7
 #define AR1010_R0_ENABLE_MASK	0x0001
+#define AR1010_R0_ENABLE_SHIFT	0
 
 // AR1010 R_1 BIT
 #define AR1010_R1_STC_INT_EN_MASK	0x0020
+#define AR1010_R1_STC_INT_EN_SHIFT	5
 #define AR1010_R1_DEEMP_MASK		0x0010
-#define AR1010_R1_MONO_MASK		0x0008
+#define AR1010_R1_DEEMP_SHIFT		4
+#define AR1010_R1_MONO_MASK			0x0008
+#define AR1010_R1_MONO_SHIFT		3
 #define AR1010_R1_SMUTE_MASK		0x0004
+#define AR1010_R1_SMUTE_SHIFT		2
 #define AR1010_R1_HMUTE_MASK		0x0002
+#define AR1010_R1_HMUTE_SHIFT		1
 
 // AR1010 R_2 BIT
 #define AR1010_R2_TUNE_MASK		0x0200
+#define AR1010_R2_TUNE_SHIFT	9
 #define AR1010_R2_CHAN_MASK		0x01FF
 #define AR1010_R2_CHAN_SHIFT		0
 
@@ -428,12 +441,28 @@ int Ar1010WaitStc(int timeout)
 int Ar1010Update()
 {
 	int ret = AR1010_OK;
-	uint16_t rx = 0;
+	// uint16_t rx = 0;
 
 	// Get RSSI Bits for signal strength
 	ret = Ar1010Read(AR1010_REG_SSI, 2);
 	if(ret < 0)
 		printf("AR1010 RSSI/RSTATUS Update fail!\r\n");
+
+	return ret;
+}
+
+/**
+ * @brief AR1010의 모든 레지스터를 읽어 ar1010을 업데이트
+ * 
+ * @return int 0(성공) / 음수(실패)
+ */
+int Ar1010UpdateAll()
+{
+	int ret = AR1010_OK;
+
+	ret = Ar1010Read(AR1010_REG0, AR1010_RD_REG_SIZE);
+	if(ret < 0)
+		printf("AR1010 Update All fail!\r\n");
 
 	return ret;
 }
@@ -449,6 +478,136 @@ int Ar1010Update()
 #define JP_MAX_FREQ		90.0
 #define JP_EX_MIN_FREQ	76.0
 #define JP_EX_MAX_FREQ	108.0
+
+/**
+ * @brief AR1010의 internal crystal 사용 혹은 external reference clock 사용 여부 결정
+ * 
+ * @param enable 1(using internal crystal) / 0(using external reference clock)
+ * @return int 0(성공) / 음수(실패)
+ */
+int Ar1010XoEnable(uint16_t enable)
+{
+	int ret = AR1010_OK;
+
+	uint16_t r0 = GetAr1010Reg(AR1010_REG0);
+	r0 &= ~AR1010_R0_XO_EN_MASK;
+	r0 |= enable << AR1010_R0_XO_EN_SHIFT;
+
+	ret = Ar1010Write(AR1010_REG0, &r0, 1);
+	if(ret < 0)
+		printf("Ar1010XoEnable function fail! value: %d\r\n", enable);
+
+	return ret;
+}
+
+/**
+ * @brief AR1010의 전력을 차단하여 Standby mode로 전환
+ * 
+ * @return int 0(성공) / 음수(실패)
+ */
+int Ar1010Off()
+{
+	int ret = AR1010_OK;
+
+	uint16_t r0 = GetAr1010Reg(AR1010_REG0);
+	r0 &= ~AR1010_R0_ENABLE_MASK;
+
+	ret = Ar1010Write(AR1010_REG0, &r0, 1);
+	if(ret < 0)
+		printf("Ar1010Off function fail!\r\n");
+
+	return ret;
+}
+
+int Ar1010StcInterruptEnable(uint16_t enable)
+{
+	int ret = AR1010_OK;
+
+	uint16_t r1 = GetAr1010Reg(AR1010_REG1);
+	r1 &= ~AR1010_R1_STC_INT_EN_MASK;
+	r1 |= enable << AR1010_R1_STC_INT_EN_SHIFT;
+
+	ret = Ar1010Write(AR1010_REG1, &r1, 1);
+	if(ret < 0)
+		printf("Ar1010StcInterruptEnable function fail! value: %d\r\n", enable);
+
+	return ret;
+}
+
+int Ar1010DeempSet(uint16_t set)
+{
+	int ret = AR1010_OK;
+
+	uint16_t r1 = GetAr1010Reg(AR1010_REG1);
+	r1 &= ~AR1010_R1_DEEMP_MASK;
+	r1 |= set << AR1010_R1_DEEMP_SHIFT;
+
+	ret = Ar1010Write(AR1010_REG1, &r1, 1);
+	if(ret < 0)
+		printf("Ar1010DeempSet function fail! value: %d\r\n", set);
+
+	return ret;
+}
+
+int Ar1010MonoEnable(uint16_t enable)
+{
+	int ret = AR1010_OK;
+
+	uint16_t r1 = GetAr1010Reg(AR1010_REG1);
+	r1 &= ~AR1010_R1_MONO_MASK;
+	r1 |= enable << AR1010_R1_MONO_SHIFT;
+
+	ret = Ar1010Write(AR1010_REG1, &r1, 1);
+	if(ret < 0)
+		printf("Ar1010MonoEnable function fail! value: %d\r\n", enable);
+
+	return ret;
+}
+
+int Ar1010SmuteEnable(uint16_t enable)
+{
+	int ret = AR1010_OK;
+
+	uint16_t r1 = GetAr1010Reg(AR1010_REG1);
+	r1 &= ~AR1010_R1_SMUTE_MASK;
+	r1 |= enable << AR1010_R1_SMUTE_SHIFT;
+
+	ret = Ar1010Write(AR1010_REG1, &r1, 1);
+	if(ret < 0)
+		printf("Ar1010SmuteEnable function fail! value: %d\r\n", enable);
+
+	return ret;
+}
+
+int Ar1010HmuteEnable(uint16_t enable)
+{
+	int ret = AR1010_OK;
+
+	uint16_t r1 = GetAr1010Reg(AR1010_REG1);
+	r1 &= ~AR1010_R1_HMUTE_MASK;
+	r1 |= enable << AR1010_R1_HMUTE_SHIFT;
+
+	ret = Ar1010Write(AR1010_REG1, &r1, 1);
+	if(ret < 0)
+		printf("Ar1010HmuteEnable function fail! value: %d\r\n", enable);
+
+	return ret;
+}
+
+int Ar1010TuneEnable(uint16_t enable)
+{
+	int ret = AR1010_OK;
+
+	uint16_t r2 = GetAr1010Reg(AR1010_REG2);
+	r2 &= ~AR1010_R2_TUNE_MASK;
+	r2 |= enable << AR1010_R2_TUNE_SHIFT;
+
+	ret = Ar1010Write(AR1010_REG2, &r2, 1);
+	if(ret < 0)
+		printf("Ar1010TuneEnable function fail! value: %d\r\n", enable);
+
+	return ret;
+}
 
 /**
  * @brief 주어진 주파수로 AR1010의 수신 주파수를 설정: TUNE (데이터시트의 Pseudo code 기준에서 약간 변경)
@@ -931,6 +1090,12 @@ int Ar1010Init(uint8_t xo_en)
 
 	return ret;
 }
+
+int Ar1010On()
+{
+	
+}
+
 
 /**
  * @brief AR1010의 SEEK 동작을 수행 (데이터시트의 Pseudo code 기준에서 약간 변경)
