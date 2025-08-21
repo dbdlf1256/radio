@@ -292,6 +292,7 @@ int SetAr1010Reg(uint8_t reg, uint16_t value)
 	return AR1010_OK;
 }
 
+// Ar1010Wrtie 함수의 인자 valueLength는 16bit 기준이지만 내부에서는 8bit 기준으로 변경해야 하기 때문에 이를 계산하기 위한 매크로
 #define AR1010_WR_LENGTH(L)	(((L) * 2) + 1)
 
  /**
@@ -371,9 +372,11 @@ int Ar1010Read(const uint8_t reg, uint32_t readLength)
 	return ret;
 }
 
-
+// STC 플래그 확인 등에 사용할 timeout 값
 #define AR1010_STC_TIMEOUT_MS	50
+
 /**
+ * 
  * @brief AR1010의 STC 플래그 확인 함수
  * 
  * @param timeout STC 플래그 확인 시간의 최대값
@@ -444,11 +447,12 @@ int Ar1010UpdateAll()
 	return ret;
 }
 
-
+// 유요한 BAND 비트의 값
 #define BAND_US_EU	0x0000
 #define BAND_JP		0x1000
 #define BAND_JP_EX	0x1800
 
+// BAND 별 최대/최소 주파수 값
 #define US_EU_MIN_FREQ	87.5
 #define US_EU_MAX_FREQ	108.0
 #define JP_MIN_FREQ		76.0
@@ -496,6 +500,12 @@ int Ar1010Off()
 	return ret;
 }
 
+/**
+ * @brief AR1010의 STC 플래그 발생 시 인터럽트를 발생시킬지 여부에 대한 설정
+ * 
+ * @param enable 1(인터럽트 활성화) / 0(인터럽트 비활성화)
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010StcInterruptEnable(uint16_t enable)
 {
 	int ret = AR1010_OK;
@@ -511,6 +521,12 @@ int Ar1010StcInterruptEnable(uint16_t enable)
 	return ret;
 }
 
+/**
+ * @brief AR1010의 De-emphasis 값을 설정
+ * 
+ * @param set 1(75us) / 0(50us)
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010DeempSet(uint16_t set)
 {
 	int ret = AR1010_OK;
@@ -526,6 +542,12 @@ int Ar1010DeempSet(uint16_t set)
 	return ret;
 }
 
+/**
+ * @brief AR1010의 출력을 MONO 또는 STEREO(수신 신호의 강도(RSSI값)에 따라 결정)로 설정
+ * 
+ * @param enable 1(MONO) / 0(STERERO or MONO)
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010MonoEnable(uint16_t enable)
 {
 	int ret = AR1010_OK;
@@ -541,6 +563,12 @@ int Ar1010MonoEnable(uint16_t enable)
 	return ret;
 }
 
+/**
+ * @brief AR1010의 Soft Mute 활성화
+ * 
+ * @param enable 1(활성화) / 0(비활성화)
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010SmuteEnable(uint16_t enable)
 {
 	int ret = AR1010_OK;
@@ -556,6 +584,12 @@ int Ar1010SmuteEnable(uint16_t enable)
 	return ret;
 }
 
+/**
+ * @brief AR1010의 Soft Mute 활성화
+ * 
+ * @param enable 1(활성화) / 0(비활성화)
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010HmuteEnable(uint16_t enable)
 {
 	int ret = AR1010_OK;
@@ -571,6 +605,12 @@ int Ar1010HmuteEnable(uint16_t enable)
 	return ret;
 }
 
+/**
+ * @brief AR1010의 TUNE 트리거 비트 설정
+ * 
+ * @param enable 1(SET) / 0(RESET)
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010TuneEnable(uint16_t enable)
 {
 	int ret = AR1010_OK;
@@ -586,9 +626,17 @@ int Ar1010TuneEnable(uint16_t enable)
 	return ret;
 }
 
+// AR1010의 목표 주파수에 맞는 CHAN 비트의 값을 계산 혹은 그 반대 
 #define AR1010_FREQ2CHAN(f)	(uint16_t)(((f) - 69) * 10)
 #define AR1010_CHAN2FREQ(c)	(double)(69 + 0.1 * (c))
 
+/**
+ * @brief BAND 별로 목표 주파수가 유효 주파수 범위 내에 있는지 확인
+ * 
+ * @param freq 목표 주파수
+ * @param band BAND 값
+ * @return int 0(유효 범위 내) / 음수(유효 범위 외)
+ */
 int Ar1010CheckBandFreq(uint16_t freq, uint16_t band)
 {
 	int ret = AR1010_OK;
@@ -624,6 +672,12 @@ int Ar1010CheckBandFreq(uint16_t freq, uint16_t band)
 	return ret;
 }
 
+/**
+ * @brief AR1010의 CHAN 비트를 설정
+ * 
+ * @param chan 설정할 CHAN 비트 값
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010ChannelSet(uint16_t chan)
 {
 	int ret = AR1010_OK;
@@ -639,6 +693,12 @@ int Ar1010ChannelSet(uint16_t chan)
 	return ret;
 }
 
+/**
+ * @brief AR1010의 SEEK 동작을 수행할 때 기존 목표 주파수에서 증가할 것인지 감소할 것인지 결정
+ * 
+ * @param upDown 1(증가) / 0(감소)
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010SeekDirection(uint16_t upDown)
 {
 	int ret = AR1010_OK;
@@ -654,6 +714,12 @@ int Ar1010SeekDirection(uint16_t upDown)
 	return ret;
 }
 
+/**
+ * @brief AR1010의 SEEK 비트를 설정
+ * 
+ * @param enable 1(SEEK-1) / 0(SEEK-0)
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010SeekEnable(uint16_t enable)
 {
 	int ret = AR1010_OK;
@@ -669,6 +735,12 @@ int Ar1010SeekEnable(uint16_t enable)
 	return ret;
 }
 
+/**
+ * @brief AR1010의 SEEK 동작을 수행할 때 증감 값을 설정
+ * 
+ * @param set 1(100kHz) / 0(200kHz)
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010SpaceSet(uint16_t set)
 {
 	int ret = AR1010_OK;
@@ -684,13 +756,19 @@ int Ar1010SpaceSet(uint16_t set)
 	return ret;
 }
 
+/**
+ * @brief AR1010의 BAND 비트를 설정
+ * 
+ * @param band 설정할 BAND 비트 값(BAND_US_EU/BAND_JP/BAND_JP_EX 중 선택)
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010BandSelect(uint16_t band)
 {
 	int ret = AR1010_OK;
 
 	uint16_t r3 = GetAr1010Reg(AR1010_REG3);
 	r3 &= ~AR1010_R3_BAND_MASK;
-	r3 |= band << AR1010_R3_BAND_SHIFT;
+	// r3 |= band << AR1010_R3_BAND_SHIFT;
 
 	ret = Ar1010Write(AR1010_REG3, &r3, 1);
 	if(ret < 0)
@@ -699,9 +777,22 @@ int Ar1010BandSelect(uint16_t band)
 	return ret;
 }
 
+/**
+ * @brief AR1010의 VOLUME 비트 설정
+ * 
+ * @param vol1 설정할 VOLUME 비트 값(개별로 사용 시 0-3 비트만 설정 (0x00-0x0F))
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010Volume1Set(uint16_t vol1)
 {
 	int ret = AR1010_REG3;
+	
+	if(vol1 > 0x0F)
+	{
+		printf("vol1 is too big!\r\n");
+		ret = AR1010_EINVAL;
+		return ret;
+	}
 
 	uint16_t r3 = GetAr1010Reg(AR1010_REG3);
 	r3 &= ~AR1010_R3_VOLUME_MASK;
@@ -714,6 +805,12 @@ int Ar1010Volume1Set(uint16_t vol1)
 	return ret;
 }
 
+/**
+ * @brief AR1010의 SEEK 동작을 수행 여부를 결정하는 수신 강도의 임계값 설정(수신 강도가 여기에 설정하는 값 이상이어야 SEEK 동작을 수행함)
+ * 
+ * @param th SEEK 동작 수행 여부 결정 수신 강도 임계값
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010SeekThSet(uint16_t th)
 {
 	int ret = AR1010_OK;
@@ -729,6 +826,12 @@ int Ar1010SeekThSet(uint16_t th)
 	return ret;
 }
 
+/**
+ * @brief AR1010이 SEEK 동작을 수행할 때 BAND 별 최대/최소값을 넘어가게된 경우 최소/최대값으로 돌아가 SEEK 동작을 수행할 것인지에 대한 여부 설정
+ * 
+ * @param enable 1(활성화) / 0(비활성화)
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010SeekWrapEnable(uint16_t enable)
 {
 	int ret = AR1010_OK;
@@ -744,6 +847,11 @@ int Ar1010SeekWrapEnable(uint16_t enable)
 	return ret;
 }
 
+/**
+ * @brief AR1010의 High Side Injection 동작을 수행하기 위한 설정
+ * 
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010HighSideInjection()
 {
 	int ret = AR1010_OK;
@@ -758,6 +866,11 @@ int Ar1010HighSideInjection()
 	return ret;
 }
 
+/**
+ * @brief AR1010의 Low Side Injection 동작을 수행하기 위한 설정
+ * 
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010LowSideInjection()
 {
 	int ret = AR1010_OK;
@@ -772,17 +885,27 @@ int Ar1010LowSideInjection()
 	return ret;
 }
 
+// AR1010의 GPIO 번호
 #define AR1010_GPIO3	2
 #define AR1010_GPIO2	1
 #define AR1010_GPIO1	0
 
+// AR1010의 GPIO 제어 비트 마스크 계산 매크로
 #define AR1010_GPIO_MASK(port)	(0x0003 << (2 * (port)))
 
+// AR1010의 GPIO 기능 설정 값
 #define AR1010_GPIO_DISABLE		0X0000
 #define AR1010_GPIO_FUNC_1(port)	(0x0001 << (2 * (port)))
 #define AR1010_GPIO_LOW(port)		(0x0002 << (2 * (port)))
 #define AR1010_GPIO_HIGH(port)		(0x0003 << (2 * (port)))
 
+/**
+ * @brief AR1010의 GPIO 포트의 기능을 설정
+ * 
+ * @param port 기능을 설정할 GPIO 포트 번호(AR1010_GPIO1/AR1010_GPIO2/AR1010_GPIO3 중 선택)
+ * @param func GPIO 기능: 0(Disable) / 1(port에 따른 특정 기능) / 2(Low Signal) / 3(High Signal)
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010GpioSet(uint8_t port, uint32_t func)
 {
 	int ret = AR1010_OK;
@@ -829,10 +952,22 @@ int Ar1010GpioSet(uint8_t port, uint32_t func)
 	return ret;
 }
 
-
+/**
+ * @brief AR1010의 VOLUME2 비트 값 설정
+ * 
+ * @param vol2 설정할 VOLUME2 비트 값 (개별로 사용 시 4-7 비트만 설정 (0x0F 초과, 0xF0 이하 (0x00은 사용 가능)))
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010Volume2Set(uint16_t vol2)
 {
 	int ret = AR1010_OK;
+
+	if((vol2 != 0) && (vol2 < 0x0F || vol2 > 0xF0))
+	{
+		printf("vol2 is invalid value!\r\n");
+		ret = AR1010_EINVAL;
+		return ret;
+	}
 
 	uint16_t r14 = GetAr1010Reg(AR1010_REG14);
 	r14 &= ~AR1010_R14_VOLUME2_MASK;
@@ -845,6 +980,11 @@ int Ar1010Volume2Set(uint16_t vol2)
 	return ret;
 }
 
+/**
+ * @brief 현재 AR1010의 volume 설정 step을 구함
+ * 
+ * @return int 0이상(volume step) / 음수(volume 설정이 잘 못 되어 있음)
+ */
 int GetAr1010VolumeStep()
 {
 	int ret = 0;
@@ -928,13 +1068,18 @@ int GetAr1010VolumeStep()
 	return ret;
 }
 
-// R3, R14 VOLUME SETTING
-int SetAr1010Volume(uint16_t stepVal)
+/**
+ * @brief AR1010의 VOLUME, VOLUME2 비트를 설정(즉, AR1010의 볼륨 설정)
+ * 
+ * @param stepVal 설정 할 볼륨 값(하위 4Bit-VOLUME Bits/상위 4Bit-VOLUME2-Bits)
+ * @return int 0(성공) / 음수(실패)
+ */
+int SetAr1010Volume(uint8_t stepVal)
 {
 	int ret = AR1010_OK;
 
-	uint16_t vol1 = stepVal & 0x000F;
-	uint16_t vol2 = stepVal & 0x00F0;
+	uint16_t vol1 = stepVal & 0x0F;
+	uint16_t vol2 = stepVal & 0xF0;
 	
 	ret = Ar1010Volume1Set(vol1);
 	if(ret < 0)
@@ -956,6 +1101,12 @@ int SetAr1010Volume(uint16_t stepVal)
 	return ret;
 }
 
+/**
+ * @brief AR1010 데이터시트에 나온 VOLUME STEP에 따라 AR1010의 볼륨 설정
+ * 
+ * @param step 설정할 볼륨의 STEP(0-18 총 19 단계)
+ * @return int 0(성공) / 음수(실패)
+ */
 int SetAr1010VolumeStep(int step)
 {
 	int ret = AR1010_OK;
@@ -1312,9 +1463,9 @@ int Ar1010HiloTune(double freq)
 }
 
 /**
- * @brief AR1010을 초기화
+ * @brief AR1010을 초기화(전원 첫 인가 시 사용)
  * 
- * @param xo_en 초기화할 때 레지스터의 값을 결정하기 위한 플래그
+ * @param xo_en 1(Internal Crystal) / 0(External Reference Clock) (초기화할 때 레지스터의 값을 결정하기 위한 플래그)
  * @return int 0(성공) / 음수(실패)
  */
 int Ar1010Init(uint8_t xo_en)
@@ -1383,13 +1534,84 @@ int Ar1010Init(uint8_t xo_en)
 	return ret;
 }
 
-/*
+/**
+ * @brief AR1010을 초기화(STANDBY 모드에서 NORMAL 모드로 전환 시 사용)
+ * 
+ * @param xo_en 1(Internal Crystal) / 0(External Reference Clock) (초기화할 때 레지스터의 값을 결정하기 위한 플래그)
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010On(uint8_t xo_en)
 {
-	
-}
-*/
+	uint32_t ret = AR1010_OK;
+	uint16_t* defaultValue = NULL;
 
+	StructAr1010Init(&ar1010);
+
+	// for stable
+	usleep(1000);
+
+	if(xo_en)
+	{
+		defaultValue = ar1010DefaultRegValEx;
+	}
+	else
+	{
+		defaultValue = ar1010DefaultRegValIn;
+	}
+
+	// Set R1 to R17 Registers to default value
+	ret = Ar1010Write(AR1010_REG1, defaultValue[AR1010_REG1], AR1010_WR_REG_SIZE - 1);
+	if(ret < 0)
+	{
+		printf("AR1010 Initialize fail!\r\n");
+		return ret;
+	}
+
+	// Set R0 Register to default value
+	ret = Ar1010Write(AR1010_REG1, defaultValue[AR1010_REG0], 1);
+	if(ret < 0)
+	{
+		printf("AR1010 Initialize fail!\r\n");
+		return ret;
+	}
+
+	// Wait STC flag
+	ret = Ar1010WaitStc(AR1010_STC_TIMEOUT_MS);
+	if(ret < 0)
+	{
+		printf("AR1010 Initialize STC Timeout!\r\n");
+		return ret;
+	}
+
+	// TUNING
+	ret = Ar1010HiloTune(AR1010_DEFAULT_FREQ_US_EU);
+	// ret = Ar1010Tune(AR1010_DEFAULT_FREQ_US_EU);
+	if(ret < 0)
+	{
+		printf("TUNE fail while AR1010 Initializing!\r\n");
+		return ret;
+	}
+
+	// Wait STC flag
+	/*
+	ret = Ar1010WaitStc(AR1010_STC_TIMEOUT_MS);
+	if(ret < 0)
+	{
+		printf("AR1010 Initialize TUNE STC Timeout!\r\n");
+		return ret;
+	}
+	*/
+
+	return ret;
+}
+
+
+/**
+ * @brief AR1010을 초기화(STANDBY MODE -> NORMAL MODE)
+ * 
+ * @param xo_en 1(Internal Crystal) / 0(External Reference Clock) (초기화할 때 레지스터의 값을 결정하기 위한 플래그)
+ * @return int 0(성공) / 음수(실패)
+ */
 int Ar1010Reset(uint8_t xo_en)
 {
 	int ret = AR1010_OK;
@@ -1404,7 +1626,10 @@ int Ar1010Reset(uint8_t xo_en)
 	}
 	else
 	{
-		ret = Ar1010Init(xo_en);
+		// for stable
+		sleep(1);
+
+		ret = Ar1010On(xo_en);
 		if(ret < 0)
 		{
 			printf("AR1010 Init fail in AR1010Reset function!\r\n");
@@ -1423,7 +1648,7 @@ int Ar1010Reset(uint8_t xo_en)
  * 
  * @return int 0(성공) / 음수(실패)
  */
-int Ar1010Seek(/*uint16_t band, uint16_t space, */)
+int Ar1010Seek()
 {
 	int ret = AR1010_OK;
 	uint16_t chan = 0;
@@ -1509,7 +1734,7 @@ int Ar1010Seek(/*uint16_t band, uint16_t space, */)
  * 
  * @return int 0(성공) / 음수(실패)
  */
-int Ar1010HiloSeek(/*double freq*/)
+int Ar1010HiloSeek()
 {
 	int ret = AR1010_OK;
 	uint16_t chan = 0;
