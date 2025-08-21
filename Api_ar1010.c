@@ -777,7 +777,7 @@ int Ar1010HighSideInjection()
 	int ret = AR1010_OK;
 
 	uint16_t r11 = GetAr1010Reg(AR1010_REG11);
-	r11 |= AR1010_R10_HILO_SIDE_MASK | AR1010_R10_HILOCTRL_B1_MASK | AR1010_R10_HILOCTRL_B2_MASK;
+	r11 |= AR1010_R11_HILO_SIDE_MASK | AR1010_R11_HILOCTRL_B1_MASK | AR1010_R11_HILOCTRL_B2_MASK;
 
 	ret = Ar1010Write(AR1010_REG11, &r11, 1);
 	if(ret < 0)
@@ -847,7 +847,7 @@ int Ar1010GpioSet(uint8_t port, uint32_t func)
 		default:
 			printf("Unknown select value!\r\n");
 			ret = AR1010_EINVAL;
-			return res;
+			return ret;
 	}
 
 	ret = Ar1010Write(AR1010_REG14, &r13, 1);
@@ -894,61 +894,61 @@ int GetAr1010VolumeStep()
 
 	switch(volume)
 	{
-		case AR1010_VOLUME_STEP0:
+		case AR1010_VOL_STEP0:
 			ret = 0;
 			break;
-		case AR1010_VOLUME_STEP1:
+		case AR1010_VOL_STEP1:
 			ret = 1;
 			break;
-		case AR1010_VOLUME_STEP2:
+		case AR1010_VOL_STEP2:
 			ret = 2;
 			break;
-		case AR1010_VOLUME_STEP3:
+		case AR1010_VOL_STEP3:
 			ret = 3;
 			break;
-		case AR1010_VOLUME_STEP4:
+		case AR1010_VOL_STEP4:
 			ret = 4;
 			break;
-		case AR1010_VOLUME_STEP5:
+		case AR1010_VOL_STEP5:
 			ret = 5;
 			break;
-		case AR1010_VOLUME_STEP6:
+		case AR1010_VOL_STEP6:
 			ret = 6;
 			break;
-		case AR1010_VOLUME_STEP7:
+		case AR1010_VOL_STEP7:
 			ret = 7;
 			break;
-		case AR1010_VOLUME_STEP8:
+		case AR1010_VOL_STEP8:
 			ret = 8;
 			break;
-		case AR1010_VOLUME_STEP9:
+		case AR1010_VOL_STEP9:
 			ret = 9;
 			break;
-		case AR1010_VOLUME_STEP10:
+		case AR1010_VOL_STEP10:
 			ret = 10;
 			break;
-		case AR1010_VOLUME_STEP11:
+		case AR1010_VOL_STEP11:
 			ret = 11;
 			break;
-		case AR1010_VOLUME_STEP12:
+		case AR1010_VOL_STEP12:
 			ret = 12;
 			break;
-		case AR1010_VOLUME_STEP13:
+		case AR1010_VOL_STEP13:
 			ret = 13;
 			break;
-		case AR1010_VOLUME_STEP14:
+		case AR1010_VOL_STEP14:
 			ret = 14;
 			break;
-		case AR1010_VOLUME_STEP15:
+		case AR1010_VOL_STEP15:
 			ret = 15;
 			break;
-		case AR1010_VOLUME_STEP16:
+		case AR1010_VOL_STEP16:
 			ret = 16;
 			break;
-		case AR1010_VOLUME_STEP17:
+		case AR1010_VOL_STEP17:
 			ret = 17;
 			break;
-		case AR1010_VOLUME_STEP18:
+		case AR1010_VOL_STEP18:
 			ret = 18;
 			break;
 		default:
@@ -995,61 +995,61 @@ int SetAr1010VolumeStep(int step)
 	switch(step)
 	{
 		case 0:
-			volStep = AR1010_VOLUME_STEP0;
+			volStep = AR1010_VOL_STEP0;
 			break;
 		case 1:
-			volStep = AR1010_VOLUME_STEP1;
+			volStep = AR1010_VOL_STEP1;
 			break;
 		case 2:
-			volStep = AR1010_VOLUME_STEP2;
+			volStep = AR1010_VOL_STEP2;
 			break;
 		case 3:
-			volStep = AR1010_VOLUME_STEP3;
+			volStep = AR1010_VOL_STEP3;
 			break;
 		case 4:
-			volStep = AR1010_VOLUME_STEP4;
+			volStep = AR1010_VOL_STEP4;
 			break;
 		case 5:
-			volStep = AR1010_VOLUME_STEP5;
+			volStep = AR1010_VOL_STEP5;
 			break;
 		case 6:
-			volStep = AR1010_VOLUME_STEP6;
+			volStep = AR1010_VOL_STEP6;
 			break;
 		case 7:
-			volStep = AR1010_VOLUME_STEP7;
+			volStep = AR1010_VOL_STEP7;
 			break;
 		case 8:
-			volStep = AR1010_VOLUME_STEP8;
+			volStep = AR1010_VOL_STEP8;
 			break;
 		case 9:
-			volStep = AR1010_VOLUME_STEP9;
+			volStep = AR1010_VOL_STEP9;
 			break;
 		case 10:
-			volStep = AR1010_VOLUME_STEP10;
+			volStep = AR1010_VOL_STEP10;
 			break;
 		case 11:
-			volStep = AR1010_VOLUME_STEP11;
+			volStep = AR1010_VOL_STEP11;
 			break;
 		case 12:
-			volStep = AR1010_VOLUME_STEP12;
+			volStep = AR1010_VOL_STEP12;
 			break;
 		case 13:
-			volStep = AR1010_VOLUME_STEP13;
+			volStep = AR1010_VOL_STEP13;
 			break;
 		case 14:
-			volStep = AR1010_VOLUME_STEP14;
+			volStep = AR1010_VOL_STEP14;
 			break;
 		case 15:
-			volStep = AR1010_VOLUME_STEP15;
+			volStep = AR1010_VOL_STEP15;
 			break;
 		case 16:
-			volStep = AR1010_VOLUME_STEP16;
+			volStep = AR1010_VOL_STEP16;
 			break;
 		case 17:
-			volStep = AR1010_VOLUME_STEP17;
+			volStep = AR1010_VOL_STEP17;
 			break;
 		case 18:
-			volStep = AR1010_VOLUME_STEP18;
+			volStep = AR1010_VOL_STEP18;
 			break;
 		default:
 			printf("SetAR1010VoluemStep function Invalid Argument!\r\n");
