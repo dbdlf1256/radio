@@ -1,8 +1,3 @@
-/*
- * 전체적으로 가독성을 높이기 위해 반복되는 구조는 함수로 만들고 구체화 및 세분화가 필요함
- * 채널 선택은 상위 코드에서 수행해야 하려나?
- */
-
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
