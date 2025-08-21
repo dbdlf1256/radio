@@ -12,10 +12,10 @@ int iic_write(unsigned char slaveAddress, unsigned char *writeData,unsigned int 
 #define AR1010_ADDR	0x10
 
 // AR1010 Register
-#define AR1010_REG0		0x00	// xo_en, ENABLE
-#define AR1010_REG1		0x01	// stc_int_en, deemp, mono, smute, hmute
-#define AR1010_REG2		0x02	// TUNE, CHAN
-#define AR1010_REG3		0x03	// SEEKUP, SEEK, SPACE, BAND, VOLUME
+#define AR1010_REG0			0x00	// xo_en, ENABLE
+#define AR1010_REG1			0x01	// stc_int_en, deemp, mono, smute, hmute
+#define AR1010_REG2			0x02	// TUNE, CHAN
+#define AR1010_REG3			0x03	// SEEKUP, SEEK, SPACE, BAND, VOLUME
 #define AR1010_REG10		0x0A	// seek_wrap
 #define AR1010_REG11		0x0B	// hilo_side, hiloctrl_b1, hiloctrl_b2
 #define AR1010_REG13		0x0C	// AR_GPIO3, AR_GPIO2, AR_GPIO1
@@ -48,16 +48,16 @@ int iic_write(unsigned char slaveAddress, unsigned char *writeData,unsigned int 
 #define AR1010_R2_TUNE_MASK		0x0200
 #define AR1010_R2_TUNE_SHIFT	9
 #define AR1010_R2_CHAN_MASK		0x01FF
-#define AR1010_R2_CHAN_SHIFT		0
+#define AR1010_R2_CHAN_SHIFT	0
 
 // AR1010 R_3 BIT
 #define AR1010_R3_SEEKUP_MASK	0x8000
 #define AR1010_R3_SEEKUP_SHIFT	15
-#define AR1010_R3_SEEK_MASK	0x4000
+#define AR1010_R3_SEEK_MASK		0x4000
 #define AR1010_R3_SEEK_SHIFT	14
 #define AR1010_R3_SPACE_MASK	0x2000
 #define AR1010_R3_SPACE_SHIFT	13
-#define AR1010_R3_BAND_MASK	0x1800
+#define AR1010_R3_BAND_MASK		0x1800
 #define AR1010_R3_BAND_SHIFT	11
 #define AR1010_R3_VOLUME_MASK	0x0780
 #define AR1010_R3_VOLUME_SHIFT	7
@@ -69,11 +69,11 @@ int iic_write(unsigned char slaveAddress, unsigned char *writeData,unsigned int 
 #define AR1010_R10_SEEK_WRAP_SHIFT	3	
 
 // AR1010 R_11 BIT
-#define AR1010_R11_HILO_SIDE_MASK	0x8000
-#define AR1010_R11_HILO_SIDE_SHIFT	15
-#define AR1010_R11_HILOCTRL_B1_MASK	0x0004
+#define AR1010_R11_HILO_SIDE_MASK		0x8000
+#define AR1010_R11_HILO_SIDE_SHIFT		15
+#define AR1010_R11_HILOCTRL_B1_MASK		0x0004
 #define AR1010_R11_HILOCTRL_B1_SHIFT	3
-#define AR1010_R11_HILOCTRL_B2_MASK	0x0001
+#define AR1010_R11_HILOCTRL_B2_MASK		0x0001
 #define AR1010_R11_HILOCTRL_B2_SHIFT	0
 
 // AR1010 R_13 BIT
@@ -98,18 +98,18 @@ int iic_write(unsigned char slaveAddress, unsigned char *writeData,unsigned int 
 // AR1010 R_STATUS BIT
 #define AR1010_RSTATUS_READCHAN_MASK	0xFF80
 #define AR1010_RSTATUS_READCHAN_SHIFT	7
-#define AR1010_RSTATUS_STC_MASK		0x0020
-#define AR1010_RSTATUS_STC_SHIFT	5
-#define AR1010_RSTATUS_SF_MASK		0x0010
-#define AR1010_RSTATUS_SF_SHIFT		4
-#define AR1010_RSTATUS_ST_MASK		0x0008
-#define AR1010_RSTATUS_ST_SHIFT		3
+#define AR1010_RSTATUS_STC_MASK			0x0020
+#define AR1010_RSTATUS_STC_SHIFT		5
+#define AR1010_RSTATUS_SF_MASK			0x0010
+#define AR1010_RSTATUS_SF_SHIFT			4
+#define AR1010_RSTATUS_ST_MASK			0x0008
+#define AR1010_RSTATUS_ST_SHIFT			3
 
 // AR1010 R_DEVICE BIT
-#define AR1010_RDEVICE_VERSION_MASK	0xF000
+#define AR1010_RDEVICE_VERSION_MASK		0xF000
 #define AR1010_RDEVICE_VERSION_SHIFT	12
-#define AR1010_RDEVICE_MFID_MASK	0x0FFF
-#define AR1010_RDEVICE_MFID_SHIFT	0
+#define AR1010_RDEVICE_MFID_MASK		0x0FFF
+#define AR1010_RDEVICE_MFID_SHIFT		0
 
 // AR1010 R_CHIPID BIT
 #define AR1010_RCHIPID_CHIPNO	0xFFFF
@@ -150,9 +150,9 @@ typedef enum
 #define AR1010_RD_REG_SIZE	29
 
 // AR1010 band별 기본 주파수 설정 값
-#define AR1010_DEFAULT_FREQ_US_EU 87.5
-#define AR1010_DEFAULT_FREQ_JP 76.0
-#define AR1010_DEFAULT_FREQ_JP_EX 76.0
+#define AR1010_DEFAULT_FREQ_US_EU	87.5
+#define AR1010_DEFAULT_FREQ_JP		76.0
+#define AR1010_DEFAULT_FREQ_JP_EX	76.0
 
 const unsigned short ar1010DefaultRegValIn[AR1010_WR_REG_SIZE] = {
 	0xFFFB, // R0: 1111 1111 1111 1011 xo_en: set, ENABLE: set
@@ -894,7 +894,7 @@ int Ar1010LowSideInjection()
 #define AR1010_GPIO_MASK(port)	(0x0003 << (2 * (port)))
 
 // AR1010의 GPIO 기능 설정 값
-#define AR1010_GPIO_DISABLE		0X0000
+#define AR1010_GPIO_DISABLE			0X0000
 #define AR1010_GPIO_FUNC_1(port)	(0x0001 << (2 * (port)))
 #define AR1010_GPIO_LOW(port)		(0x0002 << (2 * (port)))
 #define AR1010_GPIO_HIGH(port)		(0x0003 << (2 * (port)))
