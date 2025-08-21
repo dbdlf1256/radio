@@ -147,6 +147,7 @@ typedef enum
 	AR1010_EIO = -1,
 	AR1010_EINVAL = -2,
 	AR1010_ETIMEOUT = -3,
+	AR1010_EFAIL = -4
 } ar1010_err_t;
 
 // AR1010 Default Register Value
@@ -613,6 +614,7 @@ int Ar1010TuneEnable(uint16_t enable)
 }
 
 #define AR1010_FREQ2CHAN(f)	(uint16_t)(((f) - 69) * 10)
+#define AR1010_CHAN2FREQ(c)	(double)(69 + 0.1 * (c))
 
 int Ar1010CheckBandFreq(uint16_t freq, uint16_t band)
 {
@@ -667,7 +669,7 @@ int Ar1010ChannelSet(uint16_t chan)
 	return ret;
 }
 
-int Ar1010SeekUpDown(uint16_t upDown)
+int Ar1010SeekDirection(uint16_t upDown)
 {
 	int ret = AR1010_OK;
 
@@ -727,17 +729,17 @@ int Ar1010BandSelect(uint16_t band)
 	return ret;
 }
 
-int Ar1010VolumeSet(uint16_t vol)
+int Ar1010Volume1Set(uint16_t vol1)
 {
 	int ret = AR1010_REG3;
 
 	uint16_t r3 = GetAr1010Reg(AR1010_REG3);
 	r3 &= ~AR1010_R3_VOLUME_MASK;
-	r3 |= vol << AR1010_R3_VOLUME_SHIFT;
+	r3 |= vol1 << AR1010_R3_VOLUME_SHIFT;
 
 	ret = Ar1010Write(AR1010_REG3, &r3, 1);
 	if(ret < 0)
-		printf("Ar1010VolumeSet function fail! value: 0x%03X\r\n", vol);
+		printf("Ar1010VolumeSet function fail! value: 0x%03X\r\n", vol1);
 
 	return ret;
 }
@@ -806,10 +808,10 @@ int Ar1010LowSideInjection()
 
 #define AR1010_GPIO_MASK(port)	(0x0003 << (2 * (port)))
 
-#define GPIO_DISABLE		0X0000
-#define GPIO_FUNC_1(port)	(0x0001 << (2 * (port)))
-#define GPIO_LOW(port)		(0x0002 << (2 * (port)))
-#define GPIO_HIGH(port)		(0x0003 << (2 * (port)))
+#define AR1010_GPIO_DISABLE		0X0000
+#define AR1010_GPIO_FUNC_1(port)	(0x0001 << (2 * (port)))
+#define AR1010_GPIO_LOW(port)		(0x0002 << (2 * (port)))
+#define AR1010_GPIO_HIGH(port)		(0x0003 << (2 * (port)))
 
 // #define GPIO3_STEREO_IND	0x0010
 // #define GPIO2_INTERRUPT		0x0040
@@ -830,19 +832,20 @@ int Ar1010GpioSet(uint8_t port, uint32_t func)
 
 	r13 &= ~(AR1010_GPIO_MASK(port));
 
+	// GPIO 기능 선택
 	switch(func)
 	{
 		case 0:
-			r13 |= GPIO_DISABLE;
+			r13 |= AR1010_GPIO_DISABLE;
 			break;
 		case 1:
-			r13 |= GPIO_FUNC_1(port);
+			r13 |= AR1010_GPIO_FUNC_1(port);
 			break;
 		case 2:
-			r13 |= GPIO_LOW(port);
+			r13 |= AR1010_GPIO_LOW(port);
 			break;
 		case 3:
-			r13 |= GPIO_HIGH(port);
+			r13 |= AR1010_GPIO_HIGH(port);
 			break;
 		default:
 			printf("Unknown select value!\r\n");
@@ -850,7 +853,7 @@ int Ar1010GpioSet(uint8_t port, uint32_t func)
 			return ret;
 	}
 
-	ret = Ar1010Write(AR1010_REG14, &r13, 1);
+	ret = Ar1010Write(AR1010_REG13, &r13, 1);
 	if(ret < 0)
 	{
 		printf("Select GPIO3 function fail!\r\n");
@@ -964,10 +967,10 @@ int SetAr1010Volume(uint16_t stepVal)
 {
 	int ret = AR1010_OK;
 
-	uint16_t vol = stepVal & 0x000F;
+	uint16_t vol1 = stepVal & 0x000F;
 	uint16_t vol2 = stepVal & 0x00F0;
 	
-	ret = Ar1010VolumeSet(vol);
+	ret = Ar1010Volume1Set(vol1);
 	if(ret < 0)
 	{
 		printf("SetAr1010Volume function step1 fail!\r\n");
@@ -990,66 +993,66 @@ int SetAr1010Volume(uint16_t stepVal)
 int SetAr1010VolumeStep(int step)
 {
 	int ret = AR1010_OK;
-	uint16_t volStep = 0;
+	uint16_t StepVal = 0;
 
 	switch(step)
 	{
 		case 0:
-			volStep = AR1010_VOL_STEP0;
+			StepVal = AR1010_VOL_STEP0;
 			break;
 		case 1:
-			volStep = AR1010_VOL_STEP1;
+			StepVal = AR1010_VOL_STEP1;
 			break;
 		case 2:
-			volStep = AR1010_VOL_STEP2;
+			StepVal = AR1010_VOL_STEP2;
 			break;
 		case 3:
-			volStep = AR1010_VOL_STEP3;
+			StepVal = AR1010_VOL_STEP3;
 			break;
 		case 4:
-			volStep = AR1010_VOL_STEP4;
+			StepVal = AR1010_VOL_STEP4;
 			break;
 		case 5:
-			volStep = AR1010_VOL_STEP5;
+			StepVal = AR1010_VOL_STEP5;
 			break;
 		case 6:
-			volStep = AR1010_VOL_STEP6;
+			StepVal = AR1010_VOL_STEP6;
 			break;
 		case 7:
-			volStep = AR1010_VOL_STEP7;
+			StepVal = AR1010_VOL_STEP7;
 			break;
 		case 8:
-			volStep = AR1010_VOL_STEP8;
+			StepVal = AR1010_VOL_STEP8;
 			break;
 		case 9:
-			volStep = AR1010_VOL_STEP9;
+			StepVal = AR1010_VOL_STEP9;
 			break;
 		case 10:
-			volStep = AR1010_VOL_STEP10;
+			StepVal = AR1010_VOL_STEP10;
 			break;
 		case 11:
-			volStep = AR1010_VOL_STEP11;
+			StepVal = AR1010_VOL_STEP11;
 			break;
 		case 12:
-			volStep = AR1010_VOL_STEP12;
+			StepVal = AR1010_VOL_STEP12;
 			break;
 		case 13:
-			volStep = AR1010_VOL_STEP13;
+			StepVal = AR1010_VOL_STEP13;
 			break;
 		case 14:
-			volStep = AR1010_VOL_STEP14;
+			StepVal = AR1010_VOL_STEP14;
 			break;
 		case 15:
-			volStep = AR1010_VOL_STEP15;
+			StepVal = AR1010_VOL_STEP15;
 			break;
 		case 16:
-			volStep = AR1010_VOL_STEP16;
+			StepVal = AR1010_VOL_STEP16;
 			break;
 		case 17:
-			volStep = AR1010_VOL_STEP17;
+			StepVal = AR1010_VOL_STEP17;
 			break;
 		case 18:
-			volStep = AR1010_VOL_STEP18;
+			StepVal = AR1010_VOL_STEP18;
 			break;
 		default:
 			printf("SetAR1010VoluemStep function Invalid Argument!\r\n");
@@ -1057,7 +1060,7 @@ int SetAr1010VolumeStep(int step)
 			return ret;
 	}
 
-	ret = SetAr1010Volume(volStep);
+	ret = SetAr1010Volume(StepVal);
 	if(ret < 0)
 		printf("SetAr1010VolumeStep function fail!\r\n");
 
@@ -1080,6 +1083,7 @@ int Ar1010Tune(/*uint16_t band, uint16_t space, */double freq)
 	// uint16_t rx = ar1010.mem.r3 & AR1010_R3_BAND_MASK;
 	uint16_t rx = GetAr1010Reg(AR1010_REG3);
 	rx &= AR1010_R3_BAND_MASK;
+	/*
 	switch (rx)
 	{
 	case BAND_JP:
@@ -1103,15 +1107,26 @@ int Ar1010Tune(/*uint16_t band, uint16_t space, */double freq)
 		ret = AR1010_EINVAL;
 		return ret;
 	}
+	*/
+	ret = Ar1010CheckBandFreq(freq, rx);
+	if(ret < 0)
+	{
+		printf("Invalid Frequency in this band!\r\n");
+		return ret;
+	}
 
 	// 주파수 설정을 위한 CHAN 값 계산
-	uint16_t chan = (uint16_t)((freq - 69) * 10);
+	// uint16_t chan = (uint16_t)((freq - 69) * 10);
+	uint16_t chan = AR1010_FREQ2CHAN(freq);
 
 	// Set HMUTE Bit
 	// rx = ar1010.mem.r1 | AR1010_R1_HMUTE_MASK;
+	/*
 	rx = GetAr1010Reg(AR1010_REG1);
 	rx |= AR1010_R1_HMUTE_MASK;
 	ret = Ar1010Write(AR1010_REG1, &rx, 2);
+	*/
+	ret = Ar1010HmuteEnable(1);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1122,22 +1137,28 @@ int Ar1010Tune(/*uint16_t band, uint16_t space, */double freq)
 
 	// Clear TUNE Bit
 	// rx = ar1010.mem.r2 & (~AR1010_R2_TUNE_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG2);
 	rx &= ~AR1010_R2_TUNE_MASK;
 	ret = Ar1010Write(AR1010_REG2, &rx, 2);
+	*/
+	ret = Ar1010TuneEnable(0);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
 		return ret;
 	}
-
+	
 	// ar1010.mem.r2 = rx;
 
 	// Clear SEEK Bit
 	// rx = ar1010.mem.r3 & (~AR1010_R3_SEEK_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG3);
 	rx &= ~AR1010_R3_SEEK_MASK;
 	ret = Ar1010Write(AR1010_REG3, &rx, 2);
+	*/
+	ret = Ar1010SeekEnable(0);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1160,10 +1181,13 @@ int Ar1010Tune(/*uint16_t band, uint16_t space, */double freq)
 	ar1010.mem.r3 = rx;
 	*/
 	// rx = ar1010.mem.r2 & (~AR1010_R2_CHAN_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG2);
 	rx &= ~AR1010_R2_CHAN_MASK;
 	rx |= chan;
 	ret = Ar1010Write(AR1010_REG2, &rx, 2);
+	*/
+	ret = Ar1010ChannelSet(chan);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1173,8 +1197,11 @@ int Ar1010Tune(/*uint16_t band, uint16_t space, */double freq)
 	// ar1010.mem.r2 = rx;
 
 	// Enable TUNE Bit
+	/*
 	rx |= AR1010_R2_TUNE_MASK;
 	ret = Ar1010Write(AR1010_REG2, &rx, 2);
+	*/
+	ret = Ar1010TuneEnable(1);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1193,9 +1220,12 @@ int Ar1010Tune(/*uint16_t band, uint16_t space, */double freq)
 
 	// Clear HMUTE Bit
 	// rx = ar1010.mem.r1 & (~AR1010_R1_HMUTE_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG1);
 	rx &= ~AR1010_R1_HMUTE_MASK;
 	ret = Ar1010Write(AR1010_REG1, &rx, 2);
+	*/
+	ret = Ar1010HmuteEnable(0);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1226,6 +1256,7 @@ int Ar1010HiloTune(double freq)
 	// uint16_t rx = ar1010.mem.r3 & AR1010_R3_BAND_MASK;
 	uint16_t rx = GetAr1010Reg(AR1010_REG3);
 	rx &= AR1010_R3_BAND_MASK;
+	/*
 	switch (rx)
 	{
 	case BAND_JP:
@@ -1249,14 +1280,25 @@ int Ar1010HiloTune(double freq)
 		ret = AR1010_EINVAL;
 		return ret;
 	}
+	*/
+	ret = Ar1010CheckBandFreq(freq, rx);
+	if(ret < 0)
+	{
+		printf("Invalid Frequency in this band!\r\n");
+		return ret;
+	}
 
-	uint16_t chan = (uint16_t)((freq - 69) * 10);
+	// uint16_t chan = (uint16_t)((freq - 69) * 10);
+	uint16_t chan = AR1010_FREQ2CHAN(freq);
 
 	// Set HMUTE Bit
 	// rx = ar1010.mem.r1 | AR1010_R1_HMUTE_MASK;
+	/*
 	rx = GetAr1010Reg(AR1010_REG1);
 	rx |= AR1010_R1_HMUTE_MASK;
 	ret = Ar1010Write(AR1010_REG1, &rx, 1);
+	*/
+	ret = Ar1010HmuteEnable(1);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1265,9 +1307,12 @@ int Ar1010HiloTune(double freq)
 
 	// Clear TUNE Bit
 	// rx = ar1010.mem.r2 & (~AR1010_R2_TUNE_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG2);
 	rx &= ~AR1010_R2_TUNE_MASK;
 	ret = Ar1010Write(AR1010_REG2, &rx, 1);
+	*/
+	ret = Ar1010TuneEnable(0);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1278,9 +1323,12 @@ int Ar1010HiloTune(double freq)
 
 	// Clear SEEK Bit
 	// rx = ar1010.mem.r3 & (~AR1010_R3_SEEK_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG3);
 	rx &= ~AR1010_R3_SEEK_MASK;
 	ret = Ar1010Write(AR1010_REG3, &rx, 1);
+	*/
+	ret = Ar1010SeekEnable(0);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1291,10 +1339,13 @@ int Ar1010HiloTune(double freq)
 
 	// Set BAND/SPACE/CHAN Bits
 	// rx = ar1010.mem.r2 & (~AR1010_R2_CHAN_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG2);
 	rx &= ~AR1010_R2_CHAN_MASK;
 	rx |= chan;
 	ret = Ar1010Write(AR1010_REG2, &rx, 1);
+	*/
+	ret = Ar1010ChannelSet(chan);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1305,9 +1356,12 @@ int Ar1010HiloTune(double freq)
 
 	// Set R11 (clear hiloside, clear hiloctrl_b1/2)
 	// rx = ar1010.mem.r11 & ~(AR1010_R11_HILO_SIDE_MASK | AR1010_R11_HILOCTRL_B1_MASK | AR1010_R11_HILOCTRL_B2_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG11);
 	rx &= ~(AR1010_R11_HILO_SIDE_MASK | AR1010_R11_HILOCTRL_B1_MASK | AR1010_R11_HILOCTRL_B2_MASK);
 	ret = Ar1010Write(AR1010_REG11, &rx, 1);
+	*/
+	ret = Ar1010LowSideInjection();
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1318,9 +1372,12 @@ int Ar1010HiloTune(double freq)
 
 	// Enable TUNE Bit
 	// rx = ar1010.mem.r2 | AR1010_R2_TUNE_MASK;
+	/*
 	rx = GetAr1010Reg(AR1010_REG2);
 	rx |= AR1010_R2_TUNE_MASK;
 	ret = Ar1010Write(AR1010_REG2, &rx, 1);
+	*/
+	ret = Ar1010TuneEnable(1);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1349,9 +1406,12 @@ int Ar1010HiloTune(double freq)
 
 	// Clear TUNE Bit
 	// rx = ar1010.mem.r2 & (~AR1010_R2_TUNE_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG2);
 	rx &= ~AR1010_R2_TUNE_MASK;
 	ret = Ar1010Write(AR1010_REG2, &rx, 1);
+	*/
+	ret = Ar1010TuneEnable(0);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1362,9 +1422,12 @@ int Ar1010HiloTune(double freq)
 
 	// Set R11 (set hiloside, set hiloctrl_b1/2)
 	// rx = ar1010.mem.r11 | (AR1010_R11_HILO_SIDE_MASK | AR1010_R11_HILOCTRL_B1_MASK | AR1010_R11_HILOCTRL_B2_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG11);
 	rx |= AR1010_R11_HILO_SIDE_MASK | AR1010_R11_HILOCTRL_B1_MASK | AR1010_R11_HILOCTRL_B2_MASK;
 	ret = Ar1010Write(AR1010_REG2, &rx, 1);
+	*/
+	ret = Ar1010HighSideInjection();
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1375,9 +1438,12 @@ int Ar1010HiloTune(double freq)
 
 	// Enable TUNE Bit
 	// rx = ar1010.mem.r2 | AR1010_R2_TUNE_MASK;
+	/*
 	rx = GetAr1010Reg(AR1010_REG2);
 	rx |= AR1010_R2_TUNE_MASK;
 	ret = Ar1010Write(AR1010_REG2, &rx, 1);
+	*/
+	ret = Ar1010TuneEnable(1);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1406,9 +1472,12 @@ int Ar1010HiloTune(double freq)
 
 	// Clear TUNE Bit
 	// rx = ar1010.mem.r2 & (~AR1010_R2_TUNE_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG2);
 	rx &= ~AR1010_R2_TUNE_MASK;
 	ret = Ar1010Write(AR1010_REG2, &rx, 2);
+	*/
+	ret = Ar1010TuneEnable(0);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1422,9 +1491,12 @@ int Ar1010HiloTune(double freq)
 	{
 		// Set R11 (clear hiloside, clear hiloctrl_b1/2)
 		// rx = ar1010.mem.r11 & ~(AR1010_R11_HILO_SIDE_MASK | AR1010_R11_HILOCTRL_B1_MASK | AR1010_R11_HILOCTRL_B2_MASK);
+		/*
 		rx = GetAr1010Reg(AR1010_REG11);
 		rx &= ~(AR1010_R11_HILO_SIDE_MASK | AR1010_R11_HILOCTRL_B1_MASK | AR1010_R11_HILOCTRL_B2_MASK);
 		ret = Ar1010Write(AR1010_REG11, &rx, 2);
+		*/
+		ret = Ar1010LowSideInjection();
 		if(ret < 0)
 		{
 			printf("AR1010 TUNE fail!\r\n");
@@ -1433,14 +1505,22 @@ int Ar1010HiloTune(double freq)
 	}
 	else
 	{
-
+		ret = Ar1010HighSideInjection();
+		if(ret < 0)
+		{
+			printf("AR1010 TUNE fail!\r\n");
+			return ret;
+		}
 	}
 
 	// Enable TUNE Bit
 	// rx = ar1010.mem.r2 | AR1010_R2_TUNE_MASK;
+	/*
 	rx = GetAr1010Reg(AR1010_REG2);
 	rx |= AR1010_R2_TUNE_MASK;
 	ret = Ar1010Write(AR1010_REG2, &rx, 2);
+	*/
+	ret = Ar1010TuneEnable(1);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1459,9 +1539,12 @@ int Ar1010HiloTune(double freq)
 
 	// Clear HMUTE Bit
 	// rx = ar1010.mem.r1 & (~AR1010_R1_HMUTE_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG1);
 	rx &= ~AR1010_R1_HMUTE_MASK;
 	ret = Ar1010Write(AR1010_REG1, &rx, 2);
+	*/
+	ret = Ar1010HmuteEnable(0);
 	if(ret < 0)
 	{
 		printf("AR1010 TUNE fail!\r\n");
@@ -1546,9 +1629,38 @@ int Ar1010Init(uint8_t xo_en)
 	return ret;
 }
 
-int Ar1010On()
+/*
+int Ar1010On(uint8_t xo_en)
 {
 	
+}
+*/
+
+int Ar1010Reset(uint8_t xo_en)
+{
+	int ret = AR1010_OK;
+
+	// for debug
+	printf("AR1010 Reset Start!\r\n");
+
+	ret = Ar1010Off();
+	if(ret < 0)
+	{
+		printf("AR1010 Off fail in AR1010Reset function!\r\n");
+	}
+	else
+	{
+		ret = Ar1010Init(xo_en);
+		if(ret < 0)
+		{
+			printf("AR1010 Init fail in AR1010Reset function!\r\n");
+		}
+	}
+
+	// for debug
+	printf("AR1010 Reset Complete!\r\n");
+
+	return ret;
 }
 
 
@@ -1561,12 +1673,16 @@ int Ar1010Seek(/*uint16_t band, uint16_t space, */)
 {
 	int ret = AR1010_OK;
 	uint16_t chan = 0;
+	uint16_t rx = 0;
 
 	// Set HMUTE Bit
 	// uint16_t rx = ar1010.mem.r1 | AR1010_R1_HMUTE_MASK;
+	/*
 	uint16_t rx = GetAr1010Reg(AR1010_REG1);
 	rx |= AR1010_R1_HMUTE_MASK;
 	ret = Ar1010Write(AR1010_REG1, &rx, 2);
+	*/
+	ret = Ar1010HmuteEnable(1);
 	if(ret < 0)
 	{
 		printf("AR1010 SEEK fail!\r\n");
@@ -1575,9 +1691,12 @@ int Ar1010Seek(/*uint16_t band, uint16_t space, */)
 
 	// Clear TUNE Bit
 	// rx = ar1010.mem.r2 & (~AR1010_R2_TUNE_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG2);
 	rx &= ~AR1010_R2_TUNE_MASK;
 	ret = Ar1010Write(AR1010_REG2, &rx, 2);
+	*/
+	ret = Ar1010TuneEnable(0);
 	if(ret < 0)
 	{
 		printf("AR1010 SEEK fail!\r\n");
@@ -1590,9 +1709,12 @@ int Ar1010Seek(/*uint16_t band, uint16_t space, */)
 
 	// Clear SEEK Bit
 	// rx = ar1010.mem.r3 & (~AR1010_R3_SEEK_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG3);
 	rx &= ~AR1010_R3_SEEK_MASK;
 	ret = Ar1010Write(AR1010_REG3, &rx, 2);
+	*/
+	ret = Ar1010SeekEnable(0);
 	if(ret < 0)
 	{
 		printf("AR1010 SEEK fail!\r\n");
@@ -1616,8 +1738,11 @@ int Ar1010Seek(/*uint16_t band, uint16_t space, */)
 	*/
 
 	// Enable SEEK Bit
+	/*
 	rx |= AR1010_R3_SEEK_MASK;
 	ret = Ar1010Write(AR1010_REG3, &rx, 2);
+	*/
+	ret = Ar1010SeekEnable(1);
 	if(ret < 0)
 	{
 		printf("AR1010 SEEK fail!\r\n");
@@ -1636,9 +1761,12 @@ int Ar1010Seek(/*uint16_t band, uint16_t space, */)
 
 	// Clear HMUTE Bit
 	// rx = ar1010.mem.r1 & (~AR1010_R1_HMUTE_MASK);
+	/*
 	rx = GetAr1010Reg(AR1010_REG1);
 	rx &= ~AR1010_R1_HMUTE_MASK;
 	ret = Ar1010Write(AR1010_REG1, &rx, 2);
+	*/
+	ret = Ar1010HmuteEnable(0);
 	if(ret < 0)
 	{
 		printf("AR1010 SEEK fail!\r\n");
@@ -1648,17 +1776,90 @@ int Ar1010Seek(/*uint16_t band, uint16_t space, */)
 	// ar1010.mem.r1 = rx;
 	
 	// Update Functions (optional, but remember to update CHAN with the seek result in READCHAN before next seek)
+	ret = Ar1010UpdateAll();
+	if(ret < 0)
+	{
+		printf("AR1010 Update fail! Can't check SF flag!\r\n");
+		ret = AR1010_EFAIL;
+	}
+	else
+	{
+		rx = GetAr1010Reg(AR1010_REG_STATUS);
+	
+		rx &= AR1010_RSTATUS_SF_MASK;
+	
+		if(rx)
+		{
+			printf("AR1010 SEEK fail!\r\n");
+			ret = AR1010_EFAIL;
+		}
+	}
+	/*
+	ret = Ar1010Update();
+	if(ret < 0)
+	{
+		printf("AR1010 Update fail! Can't check SF flag!\r\n");
+		ret = AR1010_EFAIL;
+	}
+	else
+	{
+		rx = GetAr1010Reg(AR1010_REG_STATUS);
+
+		chan = (rx & AR1010_RSTATUS_READCHAN_MASK) >> AR1010_RSTATUS_READCHAN_SHIFT;
+
+		rx &= AR1010_RSTATUS_SF_MASK;
+
+		if(rx)
+		{
+			printf("AR1010 SEEK fail!\r\n");
+			ret = AR1010_EFAIL;
+		}
+		else
+		{
+			rx = GetAr1010Reg(AR1010_REG2);
+			rx &= ~AR1010_R2_CHAN_MASK;
+			rx |= chan;
+			SetAr1010Reg(AR1010_REG2, rx);
+		}
+	}
+	*/
+	/*
+	ret = Ar1010UpdateAll();
+	if(ret < 0)
+		printf("AR1010 Update All Register fail\r\n");
+	else
+	{
+		rx = GetAr1010Reg(AR1010_REG_STATUS);
+		chan = (rx & AR1010_RSTATUS_READCHAN_MASK) >> AR1010_RSTATUS_READCHAN_SHIFT;
+		
+		rx = GetAr1010Reg(AR1010_REG2);
+		rx &= AR1010_R2_CHAN_MASK;
+		rx >>= AR1010_R2_CHAN_SHIFT;
+	
+		if(chan != rx)
+		{
+			printf("AR1010 SEEK fail!\r\n");
+			ret = AR1010_EFAIL;
+		}
+	}
+	*/
+	/*
 	Ar1010Update();
 
-	chan = (ar1010.mem.rstatus & AR1010_RSTATUS_READCHAN_MASK) >> AR1010_RSTATUS_READCHAN_SHIFT;
-
-	if(chan != (ar1010.mem.r2 & AR1010_R2_CHAN_MASK))
+	rx = GetAr1010Reg(AR1010_REG_STATUS);
+	chan = (rx & AR1010_RSTATUS_READCHAN_MASK) >> AR1010_RSTATUS_READCHAN_SHIFT;
+	
+	rx = GetAr1010Reg(AR1010_REG2);
+	rx &= AR1010_R2_CHAN_MASK;
+	rx >>= AR1010_R2_CHAN_SHIFT;
+	if(chan != rx)
 	{
 		rx = GetAr1010Reg(AR1010_REG2);
 		rx &= AR1010_R2_CHAN_MASK;
 		rx |= chan;
 		SetAr1010Reg(AR1010_REG2, rx);
 	}
+	*/
 
 	return ret;
 }
@@ -1673,11 +1874,15 @@ int Ar1010HiloSeek(/*double freq*/)
 	int ret = AR1010_OK;
 	// uint16_t chan = (uint16_t)((freq - 69) * 10);
 	uint16_t chan = 0;
-	
+	uint16_t rx = 0;
+
 	// Set HMUTE Bit
+	/*
 	uint16_t rx = GetAr1010Reg(AR1010_REG1);
 	rx |= AR1010_R1_HMUTE_MASK;
 	ret = Ar1010Write(AR1010_REG1, &rx, 1);
+	*/
+	ret = Ar1010HmuteEnable(1);
 	if(ret < 0)
 	{
 		printf("Hilo SEEK fail!\r\n");
@@ -1685,9 +1890,12 @@ int Ar1010HiloSeek(/*double freq*/)
 	}
 
 	// Clear TUNE Bit
+	/*
 	rx = GetAr1010Reg(AR1010_REG2);
 	rx &= ~AR1010_R2_TUNE_MASK;
 	ret = Ar1010Write(AR1010_REG2, &rx, 1);
+	*/
+	ret = Ar1010TuneEnable(0);
 	if(ret < 0)
 	{
 		printf("Hilo SEEK fail!\r\n");
@@ -1708,9 +1916,12 @@ int Ar1010HiloSeek(/*double freq*/)
 	*/
 
 	// Clear SEEK Bit
+	/*
 	rx = GetAr1010Reg(AR1010_REG3);
 	rx &= ~AR1010_R3_SEEK_MASK;
 	ret = Ar1010Write(AR1010_REG3, &rx, 1);
+	*/
+	ret = Ar1010SeekEnable(0);
 	if(ret < 0)
 	{
 		printf("Hilo SEEK fail!\r\n");
@@ -1721,8 +1932,11 @@ int Ar1010HiloSeek(/*double freq*/)
 
 	// Enable SEEK Bit
 	// rx = GetAr1010Reg(AR1010_REG3);
+	/*
 	rx |= AR1010_R3_SEEK_MASK;
 	ret = Ar1010Write(AR1010_REG3, &rx, 1);
+	*/
+	ret = Ar1010SeekEnable(1);
 	if(ret < 0)
 	{
 		printf("Hilo SEEK fail!\r\n");
@@ -1738,7 +1952,36 @@ int Ar1010HiloSeek(/*double freq*/)
 	}
 
 	// If SF is not set, TUNE with auto Hi/Lo (using the seek result in READCHAN as CHAN)
+	ret = Ar1010UpdateAll();
+	if(ret < 0)
+	{
+		printf("");
+		ret = AR1010_EFAIL;
+	}
+	else
+	{
+		rx = GetAr1010Reg(AR1010_REG_STATUS);
+
+		chan = (rx & AR1010_RSTATUS_READCHAN_MASK) >> AR1010_RSTATUS_READCHAN_SHIFT;
+
+		rx &= AR1010_RSTATUS_SF_MASK;
+		if(rx)
+		{
+			printf("AR1010 HILO SEEK fail!\r\n");
+			ret = AR1010_EFAIL;
+		}
+		else
+		{
+			ret = Ar1010HiloTune(AR1010_CHAN2FREQ(chan));
+			if(ret < 0)
+			{
+				printf("AR1010 HILO SEEK fail!\r\n");
+				ret = AR1010_EFAIL;
+			}
+		}
+	}
 	// ret = Ar1010Read(AR1010_REG_STATUS, 1);
+	/*
 	Ar1010Update();
 
 	rx = GetAr1010Reg(AR1010_REG_STATUS);
@@ -1751,19 +1994,19 @@ int Ar1010HiloSeek(/*double freq*/)
 		rx = GetAr1010Reg(AR1010_REG_STATUS);
 		chan = (rx & AR1010_RSTATUS_READCHAN_MASK) >> AR1010_RSTATUS_READCHAN_SHIFT;
 		freq = 69 + 0.1 * chan;
-		/*
+		
 		rx = GetAr1010Reg(AR1010_REG2);
 		rx &= AR1010_R2_CHAN_MASK;
 		
-		if(chan != rx)
-		{
-			rx = GetAr1010Reg(AR1010_REG2);
-			rx &= AR1010_R2_CHAN_MASK;
-			rx |= chan;
-
-			SetAr1010Reg(AR1010_REG2, rx);
-		}
-		*/
+		// if(chan != rx)
+		// {
+		// 	rx = GetAr1010Reg(AR1010_REG2);
+		// 	rx &= AR1010_R2_CHAN_MASK;
+		// 	rx |= chan;
+		// 
+		// 	SetAr1010Reg(AR1010_REG2, rx);
+		// }
+		
 
 		ret = Ar1010HiloTune(freq);
 		if(ret < 0)
@@ -1797,17 +2040,22 @@ int Ar1010HiloSeek(/*double freq*/)
 
 		ret = AR1010_EIO;
 		printf("AR1010 HILO SEEK fail!\r\n");
-	}
+	}	
+	*/
 
 	// Clear HMUTE Bit
 	if(ret >= 0)
 	{
+		/*
 		rx = GetAr1010Reg(AR1010_REG1);
 		rx &= ~AR1010_R1_HMUTE_MASK;
 		ret = Ar1010Write(AR1010_REG1, &rx, 1);
+		*/
+		ret = Ar1010HmuteEnable(0);
 		if (ret < 0)
 		{
-			printf("AR1010 HMUTE fail in Ar1010HiloSeek function!\r\n");
+			printf("AR1010 HMUTE fail in Ar1010HiloSeek function! Need to reset AR1010\r\n");
+			ret = AR1010_EFAIL;
 		}
 	}
 
