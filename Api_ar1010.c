@@ -154,6 +154,11 @@ typedef enum
 #define AR1010_WR_REG_SIZE	18
 #define AR1010_RD_REG_SIZE	29
 
+//
+#define AR1010_DEFAULT_FREQ_US_EU 87.5
+#define AR1010_DEFAULT_FREQ_JP 76.0
+#define AR1010_DEFAULT_FREQ_JP_EX 76.0
+
 const unsigned short ar1010DefaultRegValIn[AR1010_WR_REG_SIZE] = {
 	0xFFFB, // R0: 1111 1111 1111 1011 xo_en: set, ENABLE: set
 	0x5B15, // R1: 0101 1011 0001 0101 stc_int_en: reset, deemp: set, mono: reset, smute: set, fmute: reset
@@ -1608,8 +1613,8 @@ int Ar1010Init(uint8_t xo_en)
 	}
 
 	// TUNING
-	ret = Ar1010HiloTune(87.5);
-	// ret = Ar1010Tune(87.5);
+	ret = Ar1010HiloTune(AR1010_DEFAULT_FREQ_US_EU);
+	// ret = Ar1010Tune(AR1010_DEFAULT_FREQ_US_EU);
 	if(ret < 0)
 	{
 		printf("TUNE fail while AR1010 Initializing!\r\n");
