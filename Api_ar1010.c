@@ -149,7 +149,7 @@ typedef enum
 #define AR1010_WR_REG_SIZE	18
 #define AR1010_RD_REG_SIZE	29
 
-//
+// AR1010 band별 기본 주파수 설정 값
 #define AR1010_DEFAULT_FREQ_US_EU 87.5
 #define AR1010_DEFAULT_FREQ_JP 76.0
 #define AR1010_DEFAULT_FREQ_JP_EX 76.0
