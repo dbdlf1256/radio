@@ -324,7 +324,8 @@ int Ar1010Write(const uint8_t reg, uint16_t* value, uint32_t valueLength)
 	if(ret < 0)
 	{
 		printf("AR1010 I2C Write fail!\r\n");
-		// ret = AR1010_EIO;
+		free(writeData);
+		return ret;
 	}
 	
 	valIndex = 0;
@@ -366,7 +367,8 @@ int Ar1010Read(const uint8_t reg, uint32_t readLength)
 	if(ret < 0)
 	{
 		printf("AR1010 I2C Read fail!\r\n");
-		ret = AR1010_EIO;
+		free(readData);
+		return ret;
 	}
 	
 	for(int r = reg; r < reg + readLength; r++)
