@@ -115,25 +115,13 @@ int iic_write(unsigned char slaveAddress, unsigned char *writeData,unsigned int 
 #define AR1010_RCHIPID_CHIPNO	0xFFFF
 
 // Volume Step Value
-#define AR1010_VOL_STEP0	0x0F
-#define AR1010_VOL_STEP1	0xCF
-#define AR1010_VOL_STEP2	0xDF
-#define AR1010_VOL_STEP3	0xFF
-#define AR1010_VOL_STEP4	0xCB
-#define AR1010_VOL_STEP5	0xDB
-#define AR1010_VOL_STEP6	0xFB
-#define AR1010_VOL_STEP7	0xFA
-#define AR1010_VOL_STEP8	0xF9
-#define AR1010_VOL_STEP9	0xF8
-#define AR1010_VOL_STEP10	0xF7
-#define AR1010_VOL_STEP11	0xD6
-#define AR1010_VOL_STEP12	0xE6
-#define AR1010_VOL_STEP13	0xF6
-#define AR1010_VOL_STEP14	0xE3
-#define AR1010_VOL_STEP15	0xF3
-#define AR1010_VOL_STEP16	0xF2
-#define AR1010_VOL_STEP17	0xF1
-#define AR1010_VOL_STEP18	0xF0
+#define AR1010_VOL_STEP_SIZE	19
+uint8_t ar1010VolStep[AR1010_VOL_STEP_SIZE] = {
+	0x0F, 0xCF, 0xDF, 0xFF, 0xCB,
+	0xDB, 0xFB, 0xFA, 0xF9, 0xF8,
+	0xF7, 0xD6, 0xE6, 0xF6, 0xE3,
+	0xF3, 0xF2, 0xF1, 0xF0
+};
 
 // 조금 더 세분화할 필요가 있음
 typedef enum
@@ -295,6 +283,12 @@ int SetAr1010Reg(uint8_t reg, uint16_t value)
 // Ar1010Wrtie 함수의 인자 valueLength는 16bit 기준이지만 내부에서는 8bit 기준으로 변경해야 하기 때문에 이를 계산하기 위한 매크로
 #define AR1010_WR_LENGTH(L)	(((L) * 2) + 1)
 
+inline void Pack16(uint8_t* buff, uint16_t value)
+{
+	buff[0] = (uint8_t)(value >> 8);
+	buff[1] = (uint8_t)(value & 0xFF);
+}
+
  /**
   * @brief 주어진 값을 주어진 길이 만큼 AR1010의 레지스터에 쓰고 전역 변수 ar1010의 값을 업데이트
   * 
@@ -320,30 +314,32 @@ int Ar1010Write(const uint8_t reg, uint16_t* value, uint32_t valueLength)
 	}
 
 	writeData[0] = reg;
-	// memcpy(&writeData[1], (uint8_t*)value, valueLength);
-	for(int i = 1; i < writeLength; i++)
+	for(int i = 1; i < writeLength; i += 2)
 	{
-		writeData[i] = ((uint8_t*)value)[i - 1];
+		Pack16(&writeData[i], value[valIndex++]);
 	}
 
 	// I2C Transmit to AR1010
-	ret = iic_write(AR1010_ADDR, writeData, valueLength);
+	ret = iic_write(AR1010_ADDR, writeData, writeLength);
 	if(ret < 0)
 	{
 		printf("AR1010 I2C Write fail!\r\n");
 		// ret = AR1010_EIO;
 	}
+	
+	valIndex = 0;
 
-	sem_wait(&ar1010_sem);
-
-	for(int r = reg; r < valueLength; r++)
+	for(int r = reg; r < reg + valueLength; r++)
 		SetAr1010Reg(r, value[valIndex++]);
-
-	sem_post(&ar1010_sem);
 
 	free(writeData);
 
 	return ret;
+}
+
+inline uint16_t Unpack16(uint8_t* buff)
+{
+	return (uint16_t)((buff[0] << 8) | buff[1]);
 }
 
 /**
@@ -355,19 +351,32 @@ int Ar1010Write(const uint8_t reg, uint16_t* value, uint32_t valueLength)
  */
 int Ar1010Read(const uint8_t reg, uint32_t readLength)
 {
-	int ret = AR1010_OK;
-	uint32_t readLength = readLength * 2;
+	int ret = AR1010_EIO;
+	int readIndex = 0;
+	uint16_t unpackData = 0;
+	uint32_t readDataLength = readLength * 2;
+	uint8_t* readData = (uint8_t*)malloc(readDataLength);
+	if(readData == NULL)
+	{
+		printf("malloc fail in Ar1010Read function!\r\n");
+		return ret;
+	}
 
-	sem_wait(&ar1010_sem);
-
-	ret = iic_read_reg(AR1010_ADDR, reg, (uint8_t*)&ar1010.rbuff[reg], readLength);
+	ret = iic_read_reg(AR1010_ADDR, reg, readData, readDataLength);
 	if(ret < 0)
 	{
 		printf("AR1010 I2C Read fail!\r\n");
 		ret = AR1010_EIO;
 	}
+	
+	for(int r = reg; r < reg + readLength; r++)
+	{
+		unpackData = Unpack16(&readData[readIndex]);
+		SetAr1010Reg(r, unpackData);
+		readIndex += 2;
+	}
 
-	sem_post(&ar1010_sem);
+	free(readData);
 
 	return ret;
 }
@@ -637,11 +646,11 @@ int Ar1010TuneEnable(uint16_t enable)
  * @param band BAND 값
  * @return int 0(유효 범위 내) / 음수(유효 범위 외)
  */
-int Ar1010CheckBandFreq(uint16_t freq, uint16_t band)
+int Ar1010CheckBandFreq(double freq, uint16_t band)
 {
 	int ret = AR1010_OK;
-	uint16_t maxFreq = 0;
-	uint16_t minFreq = 0;
+	double maxFreq = 0;
+	double minFreq = 0;
 
 	switch(band)
 	{
@@ -746,12 +755,12 @@ int Ar1010SpaceSet(uint16_t set)
 	int ret = AR1010_OK;
 
 	uint16_t r3 = GetAr1010Reg(AR1010_REG3);
-	r3 &= ~AR1010_R3_SEEKUP_MASK;
-	r3 |= set << AR1010_R3_SEEKUP_SHIFT;
+	r3 &= ~AR1010_R3_SPACE_MASK;
+	r3 |= set << AR1010_R3_SPACE_SHIFT;
 
-	ret = Ar1010Wrtie(AR1010_REG3, &r3, 1);
+	ret = Ar1010Write(AR1010_REG3, &r3, 1);
 	if(ret < 0)
-		printf("Ar1010SpaceSet function fail! value: %d\r\n");
+		printf("Ar1010SpaceSet function fail! value: %d\r\n", set);
 
 	return ret;
 }
@@ -768,7 +777,7 @@ int Ar1010BandSelect(uint16_t band)
 
 	uint16_t r3 = GetAr1010Reg(AR1010_REG3);
 	r3 &= ~AR1010_R3_BAND_MASK;
-	// r3 |= band << AR1010_R3_BAND_SHIFT;
+	r3 |= band;
 
 	ret = Ar1010Write(AR1010_REG3, &r3, 1);
 	if(ret < 0)
@@ -785,7 +794,7 @@ int Ar1010BandSelect(uint16_t band)
  */
 int Ar1010Volume1Set(uint16_t vol1)
 {
-	int ret = AR1010_REG3;
+	int ret = AR1010_OK;
 	
 	if(vol1 > 0x0F)
 	{
@@ -989,7 +998,7 @@ int GetAr1010VolumeStep()
 {
 	int ret = 0;
 
-	uint16_t volume = 0;
+	uint8_t volume = 0;
 
 	uint16_t rx = GetAr1010Reg(AR1010_REG3);
 	rx &= AR1010_R3_VOLUME_MASK;
@@ -1001,69 +1010,12 @@ int GetAr1010VolumeStep()
 	rx >>= AR1010_R14_VOLUME2_SHIFT;
 	volume |= rx;
 
-	switch(volume)
-	{
-		case AR1010_VOL_STEP0:
-			ret = 0;
+	for(; ret < AR1010_VOL_STEP_SIZE; ret++)
+		if(volume == ar1010VolStep[ret])
 			break;
-		case AR1010_VOL_STEP1:
-			ret = 1;
-			break;
-		case AR1010_VOL_STEP2:
-			ret = 2;
-			break;
-		case AR1010_VOL_STEP3:
-			ret = 3;
-			break;
-		case AR1010_VOL_STEP4:
-			ret = 4;
-			break;
-		case AR1010_VOL_STEP5:
-			ret = 5;
-			break;
-		case AR1010_VOL_STEP6:
-			ret = 6;
-			break;
-		case AR1010_VOL_STEP7:
-			ret = 7;
-			break;
-		case AR1010_VOL_STEP8:
-			ret = 8;
-			break;
-		case AR1010_VOL_STEP9:
-			ret = 9;
-			break;
-		case AR1010_VOL_STEP10:
-			ret = 10;
-			break;
-		case AR1010_VOL_STEP11:
-			ret = 11;
-			break;
-		case AR1010_VOL_STEP12:
-			ret = 12;
-			break;
-		case AR1010_VOL_STEP13:
-			ret = 13;
-			break;
-		case AR1010_VOL_STEP14:
-			ret = 14;
-			break;
-		case AR1010_VOL_STEP15:
-			ret = 15;
-			break;
-		case AR1010_VOL_STEP16:
-			ret = 16;
-			break;
-		case AR1010_VOL_STEP17:
-			ret = 17;
-			break;
-		case AR1010_VOL_STEP18:
-			ret = 18;
-			break;
-		default:
-			ret = AR1010_EINVAL;
-			break;
-	}
+
+	if(ret >= AR1010_VOL_STEP_SIZE)
+		ret = AR1010_EINVAL;
 
 	return ret;
 }
@@ -1095,6 +1047,7 @@ int SetAr1010Volume(uint8_t stepVal)
 		return ret;
 	}
 	
+	// for debug
 	int volStep = GetAr1010VolumeStep();
 	printf("Now AR1010 Volume step: %d", volStep);
 
@@ -1109,75 +1062,15 @@ int SetAr1010Volume(uint8_t stepVal)
  */
 int SetAr1010VolumeStep(int step)
 {
-	int ret = AR1010_OK;
-	uint16_t StepVal = 0;
+	int ret = AR1010_EINVAL;
 
-	switch(step)
+	if(step >= AR1010_VOL_STEP_SIZE)
 	{
-		case 0:
-			StepVal = AR1010_VOL_STEP0;
-			break;
-		case 1:
-			StepVal = AR1010_VOL_STEP1;
-			break;
-		case 2:
-			StepVal = AR1010_VOL_STEP2;
-			break;
-		case 3:
-			StepVal = AR1010_VOL_STEP3;
-			break;
-		case 4:
-			StepVal = AR1010_VOL_STEP4;
-			break;
-		case 5:
-			StepVal = AR1010_VOL_STEP5;
-			break;
-		case 6:
-			StepVal = AR1010_VOL_STEP6;
-			break;
-		case 7:
-			StepVal = AR1010_VOL_STEP7;
-			break;
-		case 8:
-			StepVal = AR1010_VOL_STEP8;
-			break;
-		case 9:
-			StepVal = AR1010_VOL_STEP9;
-			break;
-		case 10:
-			StepVal = AR1010_VOL_STEP10;
-			break;
-		case 11:
-			StepVal = AR1010_VOL_STEP11;
-			break;
-		case 12:
-			StepVal = AR1010_VOL_STEP12;
-			break;
-		case 13:
-			StepVal = AR1010_VOL_STEP13;
-			break;
-		case 14:
-			StepVal = AR1010_VOL_STEP14;
-			break;
-		case 15:
-			StepVal = AR1010_VOL_STEP15;
-			break;
-		case 16:
-			StepVal = AR1010_VOL_STEP16;
-			break;
-		case 17:
-			StepVal = AR1010_VOL_STEP17;
-			break;
-		case 18:
-			StepVal = AR1010_VOL_STEP18;
-			break;
-		default:
-			printf("SetAR1010VoluemStep function Invalid Argument!\r\n");
-			ret = AR1010_EINVAL;
-			return ret;
+		printf("Invalid Argument in SetAr1010VolumeStep function!\r\n");
+		return ret;
 	}
 
-	ret = SetAr1010Volume(StepVal);
+	ret = SetAr1010Volume(ar1010VolStep[step]);
 	if(ret < 0)
 		printf("SetAr1010VolumeStep function fail!\r\n");
 
@@ -1471,7 +1364,7 @@ int Ar1010HiloTune(double freq)
 int Ar1010Init(uint8_t xo_en)
 {
 	uint32_t ret = AR1010_OK;
-	uint16_t* defaultValue = NULL;
+	uint16_t* defaultValue = xo_en ? ar1010DefaultRegValIn : ar1010DefaultRegValEx;
 
 	sem_init(&ar1010_sem, 0, 1);
 	StructAr1010Init(&ar1010);
@@ -1479,17 +1372,8 @@ int Ar1010Init(uint8_t xo_en)
 	// for stable
 	usleep(1000);
 
-	if(xo_en)
-	{
-		defaultValue = ar1010DefaultRegValEx;
-	}
-	else
-	{
-		defaultValue = ar1010DefaultRegValIn;
-	}
-
 	// Set R1 to R17 Registers to default value
-	ret = Ar1010Write(AR1010_REG1, defaultValue[AR1010_REG1], AR1010_WR_REG_SIZE - 1);
+	ret = Ar1010Write(AR1010_REG1, &defaultValue[AR1010_REG1], AR1010_WR_REG_SIZE - 1);
 	if(ret < 0)
 	{
 		printf("AR1010 Initialize fail!\r\n");
@@ -1497,7 +1381,7 @@ int Ar1010Init(uint8_t xo_en)
 	}
 
 	// Set R0 Register to default value
-	ret = Ar1010Write(AR1010_REG1, defaultValue[AR1010_REG0], 1);
+	ret = Ar1010Write(AR1010_REG0, &defaultValue[AR1010_REG0], 1);
 	if(ret < 0)
 	{
 		printf("AR1010 Initialize fail!\r\n");
@@ -1543,24 +1427,15 @@ int Ar1010Init(uint8_t xo_en)
 int Ar1010On(uint8_t xo_en)
 {
 	uint32_t ret = AR1010_OK;
-	uint16_t* defaultValue = NULL;
+	uint16_t* defaultValue = xo_en ? ar1010DefaultRegValIn : ar1010DefaultRegValEx;
 
 	StructAr1010Init(&ar1010);
 
 	// for stable
 	usleep(1000);
 
-	if(xo_en)
-	{
-		defaultValue = ar1010DefaultRegValEx;
-	}
-	else
-	{
-		defaultValue = ar1010DefaultRegValIn;
-	}
-
 	// Set R1 to R17 Registers to default value
-	ret = Ar1010Write(AR1010_REG1, defaultValue[AR1010_REG1], AR1010_WR_REG_SIZE - 1);
+	ret = Ar1010Write(AR1010_REG1, &defaultValue[AR1010_REG1], AR1010_WR_REG_SIZE - 1);
 	if(ret < 0)
 	{
 		printf("AR1010 Initialize fail!\r\n");
@@ -1568,7 +1443,7 @@ int Ar1010On(uint8_t xo_en)
 	}
 
 	// Set R0 Register to default value
-	ret = Ar1010Write(AR1010_REG1, defaultValue[AR1010_REG0], 1);
+	ret = Ar1010Write(AR1010_REG0, &defaultValue[AR1010_REG0], 1);
 	if(ret < 0)
 	{
 		printf("AR1010 Initialize fail!\r\n");
