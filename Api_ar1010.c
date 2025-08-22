@@ -396,7 +396,7 @@ int Ar1010Read(const uint8_t reg, uint32_t readLength)
 int Ar1010WaitStc(int timeout)
 {
 	const uint32_t step = 1000;
-	uint32_t ret = AR1010_ETIMEOUT;
+	int ret = AR1010_ETIMEOUT;
 	uint16_t stc = 0;
 
 	while(timeout--)
@@ -596,7 +596,7 @@ int Ar1010SmuteEnable(uint16_t enable)
 }
 
 /**
- * @brief AR1010의 Soft Mute 활성화
+ * @brief AR1010의 Hard Mute 활성화
  * 
  * @param enable 1(활성화) / 0(비활성화)
  * @return int 0(성공) / 음수(실패)
