@@ -226,6 +226,7 @@ typedef struct
 	sem_t* lock;
 	uint8_t chan;
 	chanSel select;
+	uint8_t onoff;
 } ar1010_dev_t;
 
 // Volume Step Value
