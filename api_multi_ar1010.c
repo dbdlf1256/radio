@@ -306,7 +306,7 @@ int InitAr1010Reg(ar1010_dev_t* ar)
 	*/
 	sem_wait(ar->lock);
 
-	memset(ar->reg, 0, AR1010_RD_REG_SIZE);
+	memset(ar->reg, 0, sizeof(ar->reg));
 
 	sem_post(ar->lock);
 
@@ -389,8 +389,8 @@ int GetAr1010Regs(ar1010_dev_t* ar, uint8_t reg, uint16_t* regBuff, int length)
 
 	sem_wait(ar->lock);
 
-	for(int r = reg; r < reg + length; r++)
-		regBuff[r] = ar->reg[r];
+	for(int i = 0; i < length; i++)
+		regBuff[i] = ar->reg[i + reg];
 
 	sem_post(ar->lock);
 
@@ -453,8 +453,8 @@ int SetAr1010Regs(ar1010_dev_t* ar, uint8_t reg, uint16_t* val, int length)
 
 	sem_wait(ar->lock);
 
-	for(int r = reg; r < reg + length; r++)
-		ar->reg[r] = val[r];
+	for(int i = 0; i < length; i++)
+		ar->reg[i] = val[i + reg];
 
 	sem_post(ar->lock);
 
