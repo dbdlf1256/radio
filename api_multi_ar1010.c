@@ -226,7 +226,7 @@ typedef struct
 	sem_t* lock;
 	uint8_t chan;
 	chanSel select;
-	// uint8_t onoff;
+	uint8_t onoff; // 1: on / 0: off
 } ar1010_dev_t;
 
 // Volume Step Value
@@ -323,11 +323,14 @@ int InitAr1010Dev(ar1010_dev_t* ar, sem_t* sem, chanSel f, uint8_t chan)
 	InitAr1010Reg(ar);
 	ar->select = f;
 	ar->chan = chan;
+	ar->onoff = 1;
 	
 	return AR1010_OK;
 }
 
-uint16_t GetAr1010Reg(ar1010_dev_t* ar, uint8_t reg)
+
+
+int GetAr1010Reg(ar1010_dev_t* ar, uint8_t reg)
 {
 	if(ar == NULL)
 	{
@@ -750,6 +753,8 @@ int Ar1010Off(ar1010_dev_t* ar)
 	if(ret < 0)
 		printf("Ar1010Off function fail!\r\n");
 
+	ar->onoff = 0;
+
 	return ret;
 }
 
@@ -777,6 +782,8 @@ int Ar1010On(ar1010_dev_t* ar)
 	ret = Ar1010Write(ar, AR1010_REG0, &r0, 1);
 	if(ret < 0)
 		printf("Ar1010Off function fail!\r\n");
+
+	ar->onoff = 1;
 
 	return ret;
 }
@@ -2123,6 +2130,8 @@ int Ar1010Init(ar1010_dev_t* ar, sem_t* sem, chanSel f, uint8_t chan, uint8_t xo
 		printf("AR1010 Init fail!\r\n");
 	}
 
+	ar->onoff = 1;
+
 	return ret;
 }
 /**
@@ -2180,6 +2189,8 @@ int Ar1010Reset(ar1010_dev_t* ar, uint8_t xo_en)
 		printf("Ar1010\r\n");
 	}
 
+	ar->onoff = 1;
+
 	return ret;
 }
 
@@ -2218,6 +2229,8 @@ int Ar1010Wakeup(ar1010_dev_t* ar)
 	{
 		printf("Ar1010\r\n");
 	}
+
+	ar->onoff = 1;
 
 	return ret;
 }
