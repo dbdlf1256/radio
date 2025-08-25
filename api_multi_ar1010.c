@@ -764,6 +764,7 @@ int Ar1010Read(ar1010_dev_t* ar, const uint8_t reg, uint32_t readLength)
  * @param timeout STC 플래그 확인 시간의 최대값
  * @return int 0(성공) / 음수(실패)
  */
+/*
 int Ar1010WaitStcFast(ar1010_dev_t* ar, int timeout)
 {
 	const uint32_t step = 1000;
@@ -794,6 +795,7 @@ int Ar1010WaitStcFast(ar1010_dev_t* ar, int timeout)
 
 	return ret;
 }
+*/
 
 /**
  * 
