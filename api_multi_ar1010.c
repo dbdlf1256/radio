@@ -281,11 +281,13 @@ const unsigned short ar1010DefaultRegValEx[AR1010_WR_REG_SIZE] = {
 
 int InitAr1010Lock(ar1010_dev_t* ar)
 {
+	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
+	*/
 
 	sem_init(ar->lock, 0, 1);
 
@@ -294,17 +296,19 @@ int InitAr1010Lock(ar1010_dev_t* ar)
 
 int InitAr1010Reg(ar1010_dev_t* ar)
 {
+	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
 
-	sem_wait(&ar->lock);
+	*/
+	sem_wait(ar->lock);
 
 	memset(ar->reg, 0, AR1010_RD_REG_SIZE);
 
-	sem_post(&ar->lock);
+	sem_post(ar->lock);
 
 	return AR1010_OK;
 }
@@ -324,11 +328,15 @@ int InitAr1010Dev(ar1010_dev_t* ar, sem_t* sem, chanSel f, uint8_t chan)
 	ar->select = f;
 	ar->chan = chan;
 	ar->onoff = 1;
-	
+
+
 	return AR1010_OK;
 }
 
-
+inline int GetAr1010RegFast(ar1010_dev_t* ar, uint8_t reg)
+{
+	return ar->reg[reg];
+}
 
 int GetAr1010Reg(ar1010_dev_t* ar, uint8_t reg)
 {
@@ -347,6 +355,22 @@ int GetAr1010Reg(ar1010_dev_t* ar, uint8_t reg)
 	sem_post(ar->lock);
 
 	return regVal;
+}
+
+inline int GetAr1010RegsFast(ar1010_dev_t* ar, uint8_t reg, uint16_t* regBuff, int length)
+{
+	if(regBuff == NULL || length == 0)
+	{
+		printf("Invalid Argument in GetAr1010Regs function!\r\n");
+		return AR1010_EINVAL;
+	}
+
+	for(int i = 0; i < length; i++)
+	{
+		regBuff[i] = ar->reg[reg + i];
+	}
+
+	return AR1010_OK;
 }
 
 int GetAr1010Regs(ar1010_dev_t* ar, uint8_t reg, uint16_t* regBuff, int length)
@@ -373,6 +397,13 @@ int GetAr1010Regs(ar1010_dev_t* ar, uint8_t reg, uint16_t* regBuff, int length)
 	return AR1010_OK;
 }
 
+inline int SetAr1010RegFast(ar1010_dev_t* ar, uint8_t reg, uint16_t val)
+{
+	ar->reg[reg] = val;
+
+	return AR1010_OK;
+}
+
 int SetAr1010Reg(ar1010_dev_t* ar, uint8_t reg, uint16_t val)
 {
 	if(ar == NULL)
@@ -386,6 +417,22 @@ int SetAr1010Reg(ar1010_dev_t* ar, uint8_t reg, uint16_t val)
 	ar->reg[reg] = val;
 
 	sem_post(ar->lock);
+
+	return AR1010_OK;
+}
+
+inline int SetAr1010RegsFast(ar1010_dev_t* ar, uint8_t reg, uint16_t* val, int length)
+{
+	if(val == NULL || length == 0)
+	{
+		printf("Invalid Argument in SetAr1010Regs function!\r\n");
+		return AR1010_EINVAL;
+	}
+
+	for(int i = 0; i < length; i++)
+	{
+		ar->reg[reg + i] = val[i];
+	}
 
 	return AR1010_OK;
 }
@@ -414,6 +461,11 @@ int SetAr1010Regs(ar1010_dev_t* ar, uint8_t reg, uint16_t* val, int length)
 	return AR1010_OK;
 }
 
+inline int SwitchAr1010Fast(ar1010_dev_t* ar)
+{
+	return ar->select ? ar->select(ar->chan) : 1;
+}
+
 int SwitchAr1010(ar1010_dev_t* ar)
 {
 	if(ar == NULL)
@@ -421,6 +473,8 @@ int SwitchAr1010(ar1010_dev_t* ar)
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
+
+	// 여기도 세마포어를 걸어야 할 것 같은데...
 
 	return ar->select ? ar->select(ar->chan) : 1;
 }
@@ -457,16 +511,8 @@ inline uint16_t Unpack16(uint8_t* buff)
   * @param valueLength 레지스터에 쓸 값의 길이 (uint16_t 기준)
   * @return int 0(성공) / 음수(실패)
   */
-int Ar1010Write(ar1010_dev_t* ar, const uint8_t reg, uint16_t* value, uint32_t valueLength)
+inline int Ar1010WriteFast(ar1010_dev_t* ar, const uint8_t reg, uint16_t* value, uint32_t valueLength)
 {	
-	/*
-	if(ar == NULL)
-	{
-		printf("No Information Of AR1010!\r\n");
-		return AR1010_EINVAL;
-	}
-	*/
-
 	int ret = AR1010_OK;
 	int valIndex = 0;
 	uint32_t writeLength = AR1010_WR_LENGTH(valueLength);
@@ -478,36 +524,100 @@ int Ar1010Write(ar1010_dev_t* ar, const uint8_t reg, uint16_t* value, uint32_t v
 		return ret;
 	}
 
+	// Make Send Data
 	writeData[0] = reg;
 	for(int i = 1; i < writeLength; i += 2)
 	{
 		Pack16(&writeData[i], value[valIndex++]);
 	}
 
-	ret = SwitchAr1010(ar);
-	if(ret < 0)
-	{
-		printf("AR1010 Switching fail!\r\n");
-		free(writeData);
-		return ret;
-	}
+	ret = SwitchAr1010Fast(ar);
 
 	// I2C Transmit to AR1010
 	ret = iic_write(AR1010_ADDR, writeData, writeLength);
-	free(writeData);
 	if(ret < 0)
 	{
 		printf("AR1010 I2C Write fail!\r\n");
+
+		if(writeData)
+			free(writeData);
+
 		return ret;
 	}
+
+	if(writeData)
+		free(writeData);
 	
-	/*
-	// 여기서 SetAr1010Reg 함수를 사용하면 오버헤드가 심해지고 병목이 생길 수 있므
-	// ar->wcache를 직접 제어하는 방향으로 바꿔야하나?
-	for(int r = reg; r < reg + valueLength; r++)
-		SetAr1010Reg(ar, r, value[valIndex++]);
-	*/
-	SetAr1010Regs(ar, reg, value, valueLength);
+	SetAr1010RegsFast(ar, reg, value, valueLength);
+
+	return ret;
+}
+
+ /**
+  * @brief 주어진 값을 주어진 길이 만큼 AR1010의 레지스터에 쓰고 ar->wcache의 값을 업데이트
+  * 
+  * @param ar 제어할 AR1010의 정보를 담고 있는 구조체 포인터
+  * @param reg 저장을 시작할 AR1010의 레지스터 주소 값
+  * @param value 레지스터에 쓸 값의 포인터
+  * @param valueLength 레지스터에 쓸 값의 길이 (uint16_t 기준)
+  * @return int 0(성공) / 음수(실패)
+  */
+int Ar1010Write(ar1010_dev_t* ar, const uint8_t reg, uint16_t* value, uint32_t valueLength)
+{	
+	if(ar == NULL)
+	{
+		printf("No Information Of AR1010!\r\n");
+		return AR1010_EINVAL;
+	}
+
+	// value와 valueLength 체크를 해야할 것 같은데..
+
+	sem_wait(ar->lock);
+
+	int ret = AR1010_EIO;
+	int valIndex = 0;
+	uint32_t writeLength = AR1010_WR_LENGTH(valueLength);
+	uint8_t* writeData = (uint8_t*)malloc(writeLength);
+	if(writeData == NULL)
+	{
+		printf("malloc fail in Ar1010Write function!\r\n");
+
+		if(writeData)
+			free(writeData);
+
+		sem_post(ar->lock);
+		
+		return ret;
+	}
+
+	writeData[0] = reg;
+	for(int i = 1; i < writeLength; i += 2)
+	{
+		Pack16(&writeData[i], value[valIndex++]);
+	}
+
+	ret = SwitchAr1010Fast(ar);
+
+	// I2C Transmit to AR1010
+	ret = iic_write(AR1010_ADDR, writeData, writeLength);
+	if(ret < 0)
+	{
+		printf("AR1010 I2C Write fail!\r\n");
+
+		if(writeData)
+			free(writeData);	
+
+		sem_post(ar->lock);
+
+		return ret;
+	}
+
+	if(writeData)
+		free(writeData);	
+	
+	SetAr1010RegsFast(ar, reg, value, valueLength);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -520,16 +630,8 @@ int Ar1010Write(ar1010_dev_t* ar, const uint8_t reg, uint16_t* value, uint32_t v
  * @param readLength 읽을 레지스터의 길이 (uint16_t 기준)
  * @return int 0(성공) / 음수(실패)
  */
-int Ar1010Read(ar1010_dev_t* ar, const uint8_t reg, uint32_t readLength)
+inline int Ar1010ReadFast(ar1010_dev_t* ar, const uint8_t reg, uint32_t readLength)
 {
-	/*
-	if(ar == NULL)
-	{
-		printf("No Information Of AR1010!\r\n");
-		return AR1010_EINVAL;
-	}
-	*/
-
 	int ret = AR1010_EIO;
 	int readIndex = 0;
 	uint32_t readDataLength = readLength * 2;
@@ -548,43 +650,108 @@ int Ar1010Read(ar1010_dev_t* ar, const uint8_t reg, uint32_t readLength)
 		return ret;
 	}
 
-	ret = SwitchAr1010(ar);
-	if(ret < 0)
-	{
-		printf("AR1010 Switching fail!\r\n");
-		free(readData);
-		free(unpackData);
-		return ret;
-	}
+	ret = SwitchAr1010Fast(ar);
 
 	ret = iic_read_reg(AR1010_ADDR, reg, readData, readDataLength);
 	if(ret < 0)
 	{
 		printf("AR1010 I2C Read fail!\r\n");
-		free(readData);
-		free(unpackData);
+
+		if(readData == NULL)
+			free(readData);
+		
+		if(unpackData == NULL)
+			free(unpackData);
+
 		return ret;
 	}
 	
-	/*
-	// 여기서 SetAr1010Reg 함수를 사용하면 오버헤드가 심해지고 병목이 생길 수 있므
-	// ar->rcache를 직접 제어하는 방향으로 바꿔야하나?
-	for(int r = reg; r < reg + readLength; r++)
-	{
-		unpackData = Unpack16(&readData[readIndex]);
-		SetAr1010Reg(ar, r, unpackData);
-		readIndex += 2;
-	}
-	*/
 	for(int r = reg; r < reg + readLength; r++)
 	{
 		unpackData[r] = Unpack16(&readData[readIndex]);
 		readIndex += 2;
 	}
-	SetAr1010Regs(ar, reg, unpackData, readLength);
+	SetAr1010RegsFast(ar, reg, unpackData, readLength);
 
-	free(readData);
-	free(unpackData);
+	if(readData == NULL)
+		free(readData);
+	
+	if(unpackData == NULL)
+		free(unpackData);
+
+	return ret;
+}
+
+/**
+ * @brief AR1010의 레지스터 값을 읽어 ar->rcache에 값을 저장
+ * 
+ * @param ar 제어할 AR1010의 정보를 담고 있는 구조체 포인터
+ * @param reg 읽기 시작할 AR1010 레지스터의 주소 값
+ * @param readLength 읽을 레지스터의 길이 (uint16_t 기준)
+ * @return int 0(성공) / 음수(실패)
+ */
+int Ar1010Read(ar1010_dev_t* ar, const uint8_t reg, uint32_t readLength)
+{
+	if(ar == NULL)
+	{
+		printf("No Information Of AR1010!\r\n");
+		return AR1010_EINVAL;
+	}
+
+	sem_wait(ar->lock);
+
+	int ret = AR1010_EIO;
+	int readIndex = 0;
+	uint32_t readDataLength = readLength * 2;
+	uint16_t* unpackData = (uint16_t*)malloc(readDataLength);
+	uint8_t* readData = (uint8_t*)malloc(readDataLength);
+	if(readData == NULL || unpackData == NULL)
+	{
+		printf("malloc fail in Ar1010Read function!\r\n");
+
+		if(readData == NULL)
+			free(readData);
+		
+		if(unpackData == NULL)
+			free(unpackData);
+
+		sem_post(ar->lock);
+			
+		return ret;
+	}
+
+	ret = SwitchAr1010Fast(ar);
+
+	ret = iic_read_reg(AR1010_ADDR, reg, readData, readDataLength);
+	if(ret < 0)
+	{
+		printf("AR1010 I2C Read fail!\r\n");
+
+		if(readData == NULL)
+			free(readData);
+		
+		if(unpackData == NULL)
+			free(unpackData);
+
+		sem_post(ar->lock);
+
+		return ret;
+	}
+	
+	for(int r = reg; r < reg + readLength; r++)
+	{
+		unpackData[r] = Unpack16(&readData[readIndex]);
+		readIndex += 2;
+	}
+	SetAr1010RegsFast(ar, reg, unpackData, readLength);
+
+	if(readData == NULL)
+		free(readData);
+	
+	if(unpackData == NULL)
+		free(unpackData);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -597,16 +764,8 @@ int Ar1010Read(ar1010_dev_t* ar, const uint8_t reg, uint32_t readLength)
  * @param timeout STC 플래그 확인 시간의 최대값
  * @return int 0(성공) / 음수(실패)
  */
-int Ar1010WaitStc(ar1010_dev_t* ar, int timeout)
+int Ar1010WaitStcFast(ar1010_dev_t* ar, int timeout)
 {
-	/*
-	if(ar == NULL)
-	{
-		printf("No Information Of AR1010!\r\n");
-		return AR1010_EINVAL;
-	}
-	*/
-
 	const uint32_t step = 1000;
 	int ret = AR1010_ETIMEOUT;
 	uint16_t stc = 0;
@@ -614,13 +773,13 @@ int Ar1010WaitStc(ar1010_dev_t* ar, int timeout)
 	while(timeout--)
 	{
 		// Read Status Register
-		Ar1010Read(ar, AR1010_REG_STATUS, 1);
+		Ar1010ReadFast(ar, AR1010_REG_STATUS, 1);
 
 		// for debug
 		// printf("AR1010 STATUS REG: 0x%04D\n\r");
 		
 		// Get STC and Masking
-		stc = GetAr1010Reg(ar, AR1010_REG_STATUS);
+		stc = GetAr1010RegFast(ar, AR1010_REG_STATUS);
 		stc &= AR1010_RSTATUS_STC_MASK;
 
 		// Check STC flag
@@ -637,6 +796,55 @@ int Ar1010WaitStc(ar1010_dev_t* ar, int timeout)
 }
 
 /**
+ * 
+ * @brief AR1010의 STC 플래그 확인 함수
+ * 
+ * @param ar 제어할 AR1010의 정보를 담고 있는 구조체 포인터
+ * @param timeout STC 플래그 확인 시간의 최대값
+ * @return int 0(성공) / 음수(실패)
+ */
+int Ar1010WaitStc(ar1010_dev_t* ar, int timeout)
+{
+	if(ar == NULL)
+	{
+		printf("No Information Of AR1010!\r\n");
+		return AR1010_EINVAL;
+	}
+
+	sem_wait(ar->lock);
+
+	const uint32_t step = 1000;
+	int ret = AR1010_ETIMEOUT;
+	uint16_t stc = 0;
+
+	while(timeout--)
+	{
+		// Read Status Register
+		Ar1010ReadFast(ar, AR1010_REG_STATUS, 1);
+
+		// for debug
+		// printf("AR1010 STATUS REG: 0x%04D\n\r");
+		
+		// Get STC and Masking
+		stc = GetAr1010RegFast(ar, AR1010_REG_STATUS);
+		stc &= AR1010_RSTATUS_STC_MASK;
+
+		// Check STC flag
+		if(stc)
+		{
+			ret = AR1010_OK;
+			break;
+		}
+
+		usleep(step);
+	}
+
+	sem_post(ar->lock);
+
+	return ret;
+}
+
+/**
  * @brief AR1010의 RSSI와 STATUS 레지스터를 읽어 ar->rcache에 저장 (데이터시트 기준 동작)
  * 
  * @param ar 제어할 AR1010의 정보를 담고 있는 구조체 포인터
@@ -644,21 +852,23 @@ int Ar1010WaitStc(ar1010_dev_t* ar, int timeout)
  */
 int Ar1010Update(ar1010_dev_t* ar)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
 	// uint16_t rx = 0;
 
 	// Get RSSI Bits for signal strength
-	ret = Ar1010Read(ar, AR1010_REG_SSI, 2);
+	ret = Ar1010ReadFast(ar, AR1010_REG_SSI, 2);
 	if(ret < 0)
 		printf("AR1010 RSSI/RSTATUS Update fail!\r\n");
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -671,19 +881,21 @@ int Ar1010Update(ar1010_dev_t* ar)
  */
 int Ar1010UpdateAll(ar1010_dev_t* ar)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
 
-	ret = Ar1010Read(ar, AR1010_REG0, AR1010_RD_REG_SIZE);
+	ret = Ar1010ReadFast(ar, AR1010_REG0, AR1010_RD_REG_SIZE);
 	if(ret < 0)
 		printf("AR1010 Update All fail!\r\n");
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -707,23 +919,25 @@ int Ar1010UpdateAll(ar1010_dev_t* ar)
  */
 int Ar1010XoEnable(ar1010_dev_t* ar, uint16_t enable)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
 
-	uint16_t r0 = GetAr1010Reg(ar, AR1010_REG0);
+	uint16_t r0 = GetAr1010RegFast(ar, AR1010_REG0);
 	r0 &= ~AR1010_R0_XO_EN_MASK;
 	r0 |= enable << AR1010_R0_XO_EN_SHIFT;
 
-	ret = Ar1010Write(ar, AR1010_REG0, &r0, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG0, &r0, 1);
 	if(ret < 0)
 		printf("Ar1010XoEnable function fail! value: %d\r\n", enable);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -736,24 +950,26 @@ int Ar1010XoEnable(ar1010_dev_t* ar, uint16_t enable)
  */
 int Ar1010Off(ar1010_dev_t* ar)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
 
-	uint16_t r0 = GetAr1010Reg(ar, AR1010_REG0);
+	uint16_t r0 = GetAr1010RegFast(ar, AR1010_REG0);
 	r0 &= ~AR1010_R0_ENABLE_MASK;
 
-	ret = Ar1010Write(ar, AR1010_REG0, &r0, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG0, &r0, 1);
 	if(ret < 0)
 		printf("Ar1010Off function fail!\r\n");
 
 	ar->onoff = 0;
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -766,24 +982,26 @@ int Ar1010Off(ar1010_dev_t* ar)
  */
 int Ar1010On(ar1010_dev_t* ar)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
 
-	uint16_t r0 = GetAr1010Reg(ar, AR1010_REG0);
+	uint16_t r0 = GetAr1010RegFast(ar, AR1010_REG0);
 	r0 |= AR1010_R0_ENABLE_MASK;
 
-	ret = Ar1010Write(ar, AR1010_REG0, &r0, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG0, &r0, 1);
 	if(ret < 0)
 		printf("Ar1010Off function fail!\r\n");
 
 	ar->onoff = 1;
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -797,23 +1015,25 @@ int Ar1010On(ar1010_dev_t* ar)
  */
 int Ar1010StcInterruptEnable(ar1010_dev_t* ar, uint16_t enable)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
 
-	uint16_t r1 = GetAr1010Reg(ar, AR1010_REG1);
+	uint16_t r1 = GetAr1010RegFast(ar, AR1010_REG1);
 	r1 &= ~AR1010_R1_STC_INT_EN_MASK;
 	r1 |= enable << AR1010_R1_STC_INT_EN_SHIFT;
 
-	ret = Ar1010Write(ar, AR1010_REG1, &r1, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG1, &r1, 1);
 	if(ret < 0)
 		printf("Ar1010StcInterruptEnable function fail! value: %d\r\n", enable);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -827,23 +1047,25 @@ int Ar1010StcInterruptEnable(ar1010_dev_t* ar, uint16_t enable)
  */
 int Ar1010DeempSet(ar1010_dev_t* ar, uint16_t set)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
 
+	sem_wait(ar->lock);
+	
 	int ret = AR1010_OK;
 
-	uint16_t r1 = GetAr1010Reg(ar, AR1010_REG1);
+	uint16_t r1 = GetAr1010RegFast(ar, AR1010_REG1);
 	r1 &= ~AR1010_R1_DEEMP_MASK;
 	r1 |= set << AR1010_R1_DEEMP_SHIFT;
 
-	ret = Ar1010Write(ar, AR1010_REG1, &r1, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG1, &r1, 1);
 	if(ret < 0)
 		printf("Ar1010DeempSet function fail! value: %d\r\n", set);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -857,23 +1079,25 @@ int Ar1010DeempSet(ar1010_dev_t* ar, uint16_t set)
  */
 int Ar1010MonoEnable(ar1010_dev_t* ar, uint16_t enable)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
 
-	uint16_t r1 = GetAr1010Reg(ar, AR1010_REG1);
+	uint16_t r1 = GetAr1010RegFast(ar, AR1010_REG1);
 	r1 &= ~AR1010_R1_MONO_MASK;
 	r1 |= enable << AR1010_R1_MONO_SHIFT;
 
-	ret = Ar1010Write(ar, AR1010_REG1, &r1, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG1, &r1, 1);
 	if(ret < 0)
 		printf("Ar1010MonoEnable function fail! value: %d\r\n", enable);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -887,23 +1111,25 @@ int Ar1010MonoEnable(ar1010_dev_t* ar, uint16_t enable)
  */
 int Ar1010SmuteEnable(ar1010_dev_t* ar, uint16_t enable)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
 
-	uint16_t r1 = GetAr1010Reg(ar, AR1010_REG1);
+	uint16_t r1 = GetAr1010RegFast(ar, AR1010_REG1);
 	r1 &= ~AR1010_R1_SMUTE_MASK;
 	r1 |= enable << AR1010_R1_SMUTE_SHIFT;
 
-	ret = Ar1010Write(ar, AR1010_REG1, &r1, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG1, &r1, 1);
 	if(ret < 0)
 		printf("Ar1010SmuteEnable function fail! value: %d\r\n", enable);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -917,23 +1143,25 @@ int Ar1010SmuteEnable(ar1010_dev_t* ar, uint16_t enable)
  */
 int Ar1010HmuteEnable(ar1010_dev_t* ar, uint16_t enable)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
 
-	uint16_t r1 = GetAr1010Reg(ar, AR1010_REG1);
+	uint16_t r1 = GetAr1010RegFast(ar, AR1010_REG1);
 	r1 &= ~AR1010_R1_HMUTE_MASK;
 	r1 |= enable << AR1010_R1_HMUTE_SHIFT;
 
-	ret = Ar1010Write(ar, AR1010_REG1, &r1, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG1, &r1, 1);
 	if(ret < 0)
 		printf("Ar1010HmuteEnable function fail! value: %d\r\n", enable);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -947,23 +1175,25 @@ int Ar1010HmuteEnable(ar1010_dev_t* ar, uint16_t enable)
  */
 int Ar1010TuneEnable(ar1010_dev_t* ar, uint16_t enable)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
 
-	uint16_t r2 = GetAr1010Reg(ar, AR1010_REG2);
+	uint16_t r2 = GetAr1010RegFast(ar, AR1010_REG2);
 	r2 &= ~AR1010_R2_TUNE_MASK;
 	r2 |= enable << AR1010_R2_TUNE_SHIFT;
 
-	ret = Ar1010Write(ar, AR1010_REG2, &r2, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG2, &r2, 1);
 	if(ret < 0)
 		printf("Ar1010TuneEnable function fail! value: %d\r\n", enable);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -1018,23 +1248,25 @@ int Ar1010CheckBandFreq(double freq, uint16_t band)
  */
 int Ar1010ChannelSet(ar1010_dev_t* ar, uint16_t chan)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_post(ar->lock);
 
 	int ret = AR1010_OK;
 	
-	uint16_t r2 = GetAr1010Reg(ar, AR1010_REG2);
+	uint16_t r2 = GetAr1010RegFast(ar, AR1010_REG2);
 	r2 &= ~AR1010_R2_CHAN_MASK;
 	r2 |= chan;
 
-	ret = Ar1010Write(ar, AR1010_REG2, &r2, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG2, &r2, 1);
 	if(ret < 0)
 		printf("Ar1010ChannelSet function fail! value: 0x%03X\r\n", chan);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -1048,23 +1280,25 @@ int Ar1010ChannelSet(ar1010_dev_t* ar, uint16_t chan)
  */
 int Ar1010SeekDirection(ar1010_dev_t* ar, uint16_t upDown)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
 
-	uint16_t r3 = GetAr1010Reg(ar, AR1010_REG3);
+	uint16_t r3 = GetAr1010RegFast(ar, AR1010_REG3);
 	r3 &= ~AR1010_R3_SEEKUP_MASK;
 	r3 |= upDown << AR1010_R3_SEEKUP_SHIFT;
 
-	ret = Ar1010Write(ar, AR1010_REG3, &r3, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG3, &r3, 1);
 	if(ret < 0)
 		printf("Ar1010SeekUpDown function fail! value: %d\r\n", upDown);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -1078,23 +1312,25 @@ int Ar1010SeekDirection(ar1010_dev_t* ar, uint16_t upDown)
  */
 int Ar1010SeekEnable(ar1010_dev_t* ar, uint16_t enable)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
 
-	uint16_t r3 = GetAr1010Reg(ar, AR1010_REG3);
+	uint16_t r3 = GetAr1010RegFast(ar, AR1010_REG3);
 	r3 &= ~AR1010_R3_SEEK_MASK;
 	r3 |= enable << AR1010_R3_SEEK_SHIFT;
 
-	ret = Ar1010Write(ar, AR1010_REG3, &r3, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG3, &r3, 1);
 	if(ret < 0)
 		printf("Ar1010SeekEnable function fail! value: %d\r\n", enable);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -1108,23 +1344,25 @@ int Ar1010SeekEnable(ar1010_dev_t* ar, uint16_t enable)
  */
 int Ar1010SpaceSet(ar1010_dev_t* ar, uint16_t set)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
 
+	sem_wait(ar->lock);
+	
 	int ret = AR1010_OK;
 
-	uint16_t r3 = GetAr1010Reg(ar, AR1010_REG3);
+	uint16_t r3 = GetAr1010RegFast(ar, AR1010_REG3);
 	r3 &= ~AR1010_R3_SPACE_MASK;
 	r3 |= set << AR1010_R3_SPACE_SHIFT;
 
-	ret = Ar1010Write(ar, AR1010_REG3, &r3, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG3, &r3, 1);
 	if(ret < 0)
 		printf("Ar1010SpaceSet function fail! value: %d\r\n", set);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -1138,23 +1376,25 @@ int Ar1010SpaceSet(ar1010_dev_t* ar, uint16_t set)
  */
 int Ar1010BandSelect(ar1010_dev_t* ar, uint16_t band)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
 
+	sem_wait(ar->lock);
+	
 	int ret = AR1010_OK;
 
-	uint16_t r3 = GetAr1010Reg(ar, AR1010_REG3);
+	uint16_t r3 = GetAr1010RegFast(ar, AR1010_REG3);
 	r3 &= ~AR1010_R3_BAND_MASK;
 	r3 |= band;
 
-	ret = Ar1010Write(ar, AR1010_REG3, &r3, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG3, &r3, 1);
 	if(ret < 0)
 		printf("Ar1010BandSelect function fail! value: 0x%04X\r\n", band);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -1168,13 +1408,13 @@ int Ar1010BandSelect(ar1010_dev_t* ar, uint16_t band)
  */
 int Ar1010Volume1Set(ar1010_dev_t* ar, uint16_t vol1)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_wait(ar->lock);
 
 	int ret = AR1010_EINVAL;
 	
@@ -1184,13 +1424,15 @@ int Ar1010Volume1Set(ar1010_dev_t* ar, uint16_t vol1)
 		return ret;
 	}
 
-	uint16_t r3 = GetAr1010Reg(ar, AR1010_REG3);
+	uint16_t r3 = GetAr1010RegFast(ar, AR1010_REG3);
 	r3 &= ~AR1010_R3_VOLUME_MASK;
 	r3 |= vol1 << AR1010_R3_VOLUME_SHIFT;
 
-	ret = Ar1010Write(ar, AR1010_REG3, &r3, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG3, &r3, 1);
 	if(ret < 0)
 		printf("Ar1010VolumeSet function fail! value: 0x%03X\r\n", vol1);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -1204,23 +1446,25 @@ int Ar1010Volume1Set(ar1010_dev_t* ar, uint16_t vol1)
  */
 int Ar1010SeekThSet(ar1010_dev_t* ar, uint16_t th)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
+
+	sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
 
-	uint16_t r3 = GetAr1010Reg(ar, AR1010_REG3);
+	uint16_t r3 = GetAr1010RegFast(ar, AR1010_REG3);
 	r3 &= ~AR1010_R3_SEEKTH_MASK;
 	r3 |= th;
 
-	ret = Ar1010Write(ar, AR1010_REG3, &r3, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG3, &r3, 1);
 	if(ret < 0)
 		printf("Ar1010SeekThSet function fail! value: 0x%02X\r\n", th);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -1234,23 +1478,25 @@ int Ar1010SeekThSet(ar1010_dev_t* ar, uint16_t th)
  */
 int Ar1010SeekWrapEnable(ar1010_dev_t* ar, uint16_t enable)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
 
+	sem_wait(ar->lock);
+	
 	int ret = AR1010_OK;
 
-	uint16_t r10 = GetAr1010Reg(ar, AR1010_REG10);
+	uint16_t r10 = GetAr1010RegFast(ar, AR1010_REG10);
 	r10 &= ~AR1010_R10_SEEK_WRAP_MASK;
 	r10 |= enable << AR1010_R10_SEEK_WRAP_SHIFT;
 
-	ret = Ar1010Write(ar, AR1010_REG10, &r10, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG10, &r10, 1);
 	if(ret < 0)
 		printf("Ar1010SeekWrapEnable function fail! value: %d\r\n", enable);
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -1263,22 +1509,24 @@ int Ar1010SeekWrapEnable(ar1010_dev_t* ar, uint16_t enable)
  */
 int Ar1010HighSideInjection(ar1010_dev_t* ar)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
 
+	sem_wait(ar->lock);
+	
 	int ret = AR1010_OK;
 
-	uint16_t r11 = GetAr1010Reg(ar, AR1010_REG11);
+	uint16_t r11 = GetAr1010RegFast(ar, AR1010_REG11);
 	r11 |= AR1010_R11_HILO_SIDE_MASK | AR1010_R11_HILOCTRL_B1_MASK | AR1010_R11_HILOCTRL_B2_MASK;
 
-	ret = Ar1010Write(ar, AR1010_REG11, &r11, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG11, &r11, 1);
 	if(ret < 0)
 		printf("Ar1010HighSideInjection function fail!\r\n");
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -1291,22 +1539,24 @@ int Ar1010HighSideInjection(ar1010_dev_t* ar)
  */
 int Ar1010LowSideInjection(ar1010_dev_t* ar)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
 
+	sem_wait(ar->lock);
+	
 	int ret = AR1010_OK;
 
-	uint16_t r11 = GetAr1010Reg(ar, AR1010_REG11);
+	uint16_t r11 = GetAr1010RegFast(ar, AR1010_REG11);
 	r11 &= ~(AR1010_R11_HILO_SIDE_MASK | AR1010_R11_HILOCTRL_B1_MASK | AR1010_R11_HILOCTRL_B2_MASK);
 
-	ret = Ar1010Write(ar, AR1010_REG11, &r11, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG11, &r11, 1);
 	if(ret < 0)
 		printf("Ar1010LowSideInjection function fail!\r\n");
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -1321,14 +1571,14 @@ int Ar1010LowSideInjection(ar1010_dev_t* ar)
  */
 int Ar1010GpioSet(ar1010_dev_t* ar, uint8_t port, uint32_t func)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
 
+	sem_wait(ar->lock);
+	
 	int ret = AR1010_EINVAL;
 
 	if(port > AR1010_GPIO3)
@@ -1337,7 +1587,7 @@ int Ar1010GpioSet(ar1010_dev_t* ar, uint8_t port, uint32_t func)
 		return ret;
 	}
 
-	unsigned short r13 = GetAr1010Reg(ar, AR1010_REG13);
+	unsigned short r13 = GetAr1010RegFast(ar, AR1010_REG13);
 
 	r13 &= ~(AR1010_GPIO_MASK(port));
 
@@ -1361,12 +1611,14 @@ int Ar1010GpioSet(ar1010_dev_t* ar, uint8_t port, uint32_t func)
 			return ret;
 	}
 
-	ret = Ar1010Write(ar, AR1010_REG13, &r13, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG13, &r13, 1);
 	if(ret < 0)
 	{
 		printf("Select GPIO3 function fail!\r\n");
 		return ret;
 	}
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -1380,14 +1632,14 @@ int Ar1010GpioSet(ar1010_dev_t* ar, uint8_t port, uint32_t func)
  */
 int Ar1010Volume2Set(ar1010_dev_t* ar, uint16_t vol2)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
 
+	sem_wait(ar->lock);
+	
 	int ret = AR1010_EINVAL;
 
 	if((vol2 != 0) && (vol2 < 0x0F || vol2 > 0xF0))
@@ -1396,13 +1648,15 @@ int Ar1010Volume2Set(ar1010_dev_t* ar, uint16_t vol2)
 		return ret;
 	}
 
-	uint16_t r14 = GetAr1010Reg(ar, AR1010_REG14);
+	uint16_t r14 = GetAr1010RegFast(ar, AR1010_REG14);
 	r14 &= ~AR1010_R14_VOLUME2_MASK;
 	r14 |= vol2 << AR1010_R14_VOLUME2_SHIFT;
 
-	ret = Ar1010Write(ar, AR1010_REG14, &r14, 1);
+	ret = Ar1010WriteFast(ar, AR1010_REG14, &r14, 1);
 	if(ret < 0)
 		printf("Ar1010Volume2Set functio fail! value: 0x%04X\r\n");
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -1421,16 +1675,18 @@ int GetAr1010VolumeStep(ar1010_dev_t* ar)
 		return AR1010_EINVAL;
 	}
 
+	sem_wait(ar->lock);
+	
 	int ret = 0;
 
 	uint8_t volume = 0;
 
-	uint16_t rx = GetAr1010Reg(ar, AR1010_REG3);
+	uint16_t rx = GetAr1010RegFast(ar, AR1010_REG3);
 	rx &= AR1010_R3_VOLUME_MASK;
 	rx >>= AR1010_R3_VOLUME_SHIFT;
 	volume |= rx;
 
-	rx = GetAr1010Reg(ar, AR1010_REG14);
+	rx = GetAr1010RegFast(ar, AR1010_REG14);
 	rx &= AR1010_R14_VOLUME2_MASK;
 	rx >>= AR1010_R14_VOLUME2_SHIFT;
 	volume |= rx;
@@ -1441,6 +1697,8 @@ int GetAr1010VolumeStep(ar1010_dev_t* ar)
 
 	if(ret >= AR1010_VOL_STEP_SIZE)
 		ret = AR1010_EINVAL;
+
+	sem_post(ar->lock);
 
 	return ret;
 }
@@ -1454,13 +1712,11 @@ int GetAr1010VolumeStep(ar1010_dev_t* ar)
  */
 int SetAr1010Volume(ar1010_dev_t* ar, uint8_t stepVal)
 {
-	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
 	}
-	*/
 
 	int ret = AR1010_OK;
 
@@ -2204,11 +2460,13 @@ int Ar1010Wakeup(ar1010_dev_t* ar)
 {
 	int ret = AR1010_EINVAL;
 
+	/*
 	if(ar == NULL)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return ret;
 	}
+	*/
 	
 	uint16_t writeData[AR1010_WR_REG_SIZE] = { 0, };
 
