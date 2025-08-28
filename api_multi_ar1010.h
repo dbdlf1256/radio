@@ -224,13 +224,13 @@ typedef struct
 	uint8_t onoff; // 1: on / 0: off
 } ar1010_dev_t;
 
+extern ar1010_dev_t ar1010Ch1;
+extern ar1010_dev_t ar1010Ch2;
+extern sem_t ar1010Ch1_sem;
+extern sem_t ar1010Ch2_sem;
+
 // Volume Step Value
-uint8_t ar1010VolStep[AR1010_VOL_STEP_SIZE] = {
-	0x0F, 0xCF, 0xDF, 0xFF, 0xCB,
-	0xDB, 0xFB, 0xFA, 0xF9, 0xF8,
-	0xF7, 0xD6, 0xE6, 0xF6, 0xE3,
-	0xF3, 0xF2, 0xF1, 0xF0
-};
+extern uint8_t ar1010VolStep[AR1010_VOL_STEP_SIZE];
 
 int InitAr1010Dev(ar1010_dev_t* ar, sem_t* sem);
 int GetAr1010Reg(ar1010_dev_t* ar, uint8_t reg);

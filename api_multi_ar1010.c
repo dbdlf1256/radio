@@ -10,6 +10,11 @@ int iic_read_reg(unsigned char slaveAddress,unsigned char regAddr,unsigned char 
 int iic_write(unsigned char slaveAddress, unsigned char *writeData,unsigned int writeDataLength);
 int I2CSwitch(unsigned char channel);
 
+ar1010_dev_t ar1010Ch1;
+ar1010_dev_t ar1010Ch2;
+sem_t ar1010Ch1_sem;
+sem_t ar1010Ch2_sem;
+
 // AR1010 Default Register Value
 //const unsigned short ar1010DefaultRegValIn[AR1010_WR_REG_SIZE] = {
 unsigned short ar1010DefaultRegValIn[AR1010_WR_REG_SIZE] = {
@@ -52,6 +57,13 @@ unsigned short ar1010DefaultRegValEx[AR1010_WR_REG_SIZE] = {
 	0x8097, // R15: 1000 0000 1001 0111
 	0x04A1, // R16
 	0xDF6A  // R17
+};
+
+uint8_t ar1010VolStep[AR1010_VOL_STEP_SIZE] = {
+	0x0F, 0xCF, 0xDF, 0xFF, 0xCB,
+	0xDB, 0xFB, 0xFA, 0xF9, 0xF8,
+	0xF7, 0xD6, 0xE6, 0xF6, 0xE3,
+	0xF3, 0xF2, 0xF1, 0xF0
 };
 
 // ar과 세마포어 안 거는 함수들
@@ -150,7 +162,8 @@ int GetAr1010Regs(ar1010_dev_t* ar, uint8_t reg, uint16_t* regBuff, int length)
 
 	// sem_wait(ar->lock);
 
-	for(int i = 0; i < length; i++)
+	int i;
+	for(i = 0; i < length; i++)
 		regBuff[i] = ar->reg[i + reg];
 
 	// sem_post(ar->lock);
@@ -194,8 +207,8 @@ int SetAr1010Regs(ar1010_dev_t* ar, uint8_t reg, uint16_t* val, int length)
 	}
 
 	// sem_wait(ar->lock);
-
-	for(int i = 0; i < length; i++)
+	int i;
+	for(i = 0; i < length; i++)
 		ar->reg[i + reg] = val[i];
 
 	// sem_post(ar->lock);
@@ -270,7 +283,8 @@ int Ar1010Write(ar1010_dev_t* ar, const uint8_t reg, uint16_t* value, uint32_t v
 	}
 
 	writeData[0] = reg;
-	for(int i = 1; i < writeLength; i += 2)
+	int i;
+	for(i = 1; i < writeLength; i += 2)
 	{
 		Pack16(&writeData[i], value[valIndex++]);
 	}
@@ -355,7 +369,8 @@ int Ar1010Read(ar1010_dev_t* ar, const uint8_t reg, uint32_t readLength)
 		readIndex += 2;
 	}
 	*/
-	for(int i = 0; i < readLength; i++)
+	int i;
+	for(i = 0; i < readLength; i++)
 	{
 		unpackData[i] = Unpack16(&readData[readIndex]);
 		readIndex += 2;
@@ -575,7 +590,7 @@ int Ar1010On(ar1010_dev_t* ar)
 	if(ret < 0)
 		printf("Ar1010Off function fail!\r\n");
 
-	ar->onoff = 1;
+	// ar->onoff = 1;
 
 	return ret;
 }
@@ -794,7 +809,7 @@ int Ar1010CheckBandFreq(double freq, uint16_t band)
 
 	if(freq >= minFreq && freq <= maxFreq)
 	{
-		printf("Invalid Frequency!\r\n");
+		printf("Valid Frequency! %.1f\r\n", freq);
 		ret = AR1010_OK;
 	}
 
@@ -1329,6 +1344,12 @@ int Ar1010Tune(ar1010_dev_t* ar, /*uint16_t band, uint16_t space, */double freq)
 		return AR1010_EINVAL;
 	}
 
+	if(ar->onoff == 0)
+	{
+		printf("AR1010 is Off Now!\r\n");
+		return AR1010_EFAIL;
+	}
+
 	int ret = AR1010_OK;
 	// double maxFreq = US_EU_MAX_FREQ;
 	// double minFreq = US_EU_MIN_FREQ;
@@ -1433,6 +1454,12 @@ int Ar1010HiloTune(ar1010_dev_t* ar, double freq)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
+	}
+
+	if(ar->onoff == 0)
+	{
+		printf("AR1010 is Off Now!\r\n");
+		return AR1010_EFAIL;
 	}
 
 	// sem_wait(ar->lock);
@@ -1648,6 +1675,12 @@ int Ar1010Seek(ar1010_dev_t* ar)
 		return AR1010_EINVAL;
 	}
 
+	if(ar->onoff == 0)
+	{
+		printf("AR1010 is Off Now!\r\n");
+		return AR1010_EFAIL;
+	}
+
 	// sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
@@ -1750,6 +1783,12 @@ int Ar1010HiloSeek(ar1010_dev_t* ar)
 	{
 		printf("No Information Of AR1010!\r\n");
 		return AR1010_EINVAL;
+	}
+
+	if(ar->onoff == 0)
+	{
+		printf("AR1010 is Off Now!\r\n");
+		return AR1010_EFAIL;
 	}
 
 	int ret = AR1010_OK;
@@ -1866,7 +1905,7 @@ int Ar1010HiloSeek(ar1010_dev_t* ar)
  * @param xo_en 1(Internal Crystal) / 0(External Reference Clock) (초기화할 때 레지스터의 값을 결정하기 위한 플래그)
  * @return int 0(성공) / 음수(실패)
  */
-int Ar1010InitSequence(ar1010_dev_t* ar, uint16_t* custum)
+int Ar1010InitSequence(ar1010_dev_t* ar, uint16_t* custom)
 {
 	/*
 	if(ar == NULL)
@@ -1890,7 +1929,8 @@ int Ar1010InitSequence(ar1010_dev_t* ar, uint16_t* custum)
 	// sem_wait(ar->lock);
 
 	// Set R1 to R17 Registers to default value
-	ret = Ar1010Write(ar, AR1010_REG1, &custum[AR1010_REG1], AR1010_WR_REG_SIZE - 1);
+	printf("FMR - Ar1010InitSequence Function Start!\r\n");
+	ret = Ar1010Write(ar, AR1010_REG1, &custom[AR1010_REG1], AR1010_WR_REG_SIZE - 1);
 	if(ret < 0)
 	{
 		printf("AR1010 Initialize fail!\r\n");
@@ -1899,7 +1939,7 @@ int Ar1010InitSequence(ar1010_dev_t* ar, uint16_t* custum)
 	}
 
 	// Set R0 Register to default value
-	ret = Ar1010Write(ar, AR1010_REG0, &custum[AR1010_REG0], 1);
+	ret = Ar1010Write(ar, AR1010_REG0, custom, 1);
 	if(ret < 0)
 	{
 		printf("AR1010 Initialize fail!\r\n");
@@ -1915,6 +1955,8 @@ int Ar1010InitSequence(ar1010_dev_t* ar, uint16_t* custum)
 		// sem_post(ar->lock);
 		return ret;
 	}
+
+	ar->onoff = 1;
 
 	// TUNING
 	ret = Ar1010HiloTune(ar, AR1010_DEFAULT_FREQ_US_EU);
@@ -1937,8 +1979,7 @@ int Ar1010InitSequence(ar1010_dev_t* ar, uint16_t* custum)
 	}
 	*/
 
-	ar->onoff = 1;
-
+	printf("FMR - Ar1010InitSequence Function End!\r\n");
 	return ret;
 }
 
@@ -1963,6 +2004,7 @@ int Ar1010Init(ar1010_dev_t* ar, sem_t* sem, const uint8_t xo_en)
 	int ret = AR1010_OK;
 	uint16_t* defaultValue = xo_en ? ar1010DefaultRegValIn : ar1010DefaultRegValEx;
 
+	printf("FMR - AR1010 Init Start!\r\n");
 	InitAr1010Dev(ar, sem);
 
 	// sem_wait(ar->lock);
@@ -1976,6 +2018,7 @@ int Ar1010Init(ar1010_dev_t* ar, sem_t* sem, const uint8_t xo_en)
 
 	// ar->onoff = 1;
 
+	printf("FMR - AR1010 Init End!\r\n");
 	return ret;
 }
 /**
@@ -2001,7 +2044,7 @@ int Ar1010Reset(ar1010_dev_t* ar, uint8_t xo_en)
 	ret = Ar1010Off(ar);
 	if(ret < 0)
 	{
-		printf("Ar1010\r\n");
+		printf("AR1010 Reset fail!\r\n");
 		// sem_post(ar->lock);
 		return ret;
 	}
@@ -2009,32 +2052,18 @@ int Ar1010Reset(ar1010_dev_t* ar, uint8_t xo_en)
 	ret = InitAr1010Reg(ar);
 	if(ret < 0)
 	{
-		printf("Ar1010\r\n");
+		printf("AR1010 Reset fail!\r\n");
 		// sem_post(ar->lock);
 		return ret;
 	}
 
 	// 3초 대기
 	usleep(3000);
-	if(ret < 0)
-	{
-		printf("Ar1010\r\n");
-		// sem_post(ar->lock);
-		return ret;
-	}
-
-	ret = Ar1010On(ar);
-	if(ret < 0)
-	{
-		printf("Ar1010\r\n");
-		// sem_post(ar->lock);
-		return ret;
-	}
 
 	ret = Ar1010InitSequence(ar, defaultValue);
 	if(ret < 0)
 	{
-		printf("Ar1010\r\n");
+		printf("AR1010 Reset fail!\r\n");
 	}
 
 	// ar->onoff = 1;
@@ -2062,28 +2091,39 @@ int Ar1010Wakeup(ar1010_dev_t* ar)
 
 	// sem_wait(ar->lock);
 	
+	/*
 	uint16_t writeData[AR1010_WR_REG_SIZE] = { 0, };
 
-	for(int r = AR1010_REG0; r < AR1010_WR_REG_SIZE; r++)
+	int r;
+	for(r = AR1010_REG0; r < AR1010_WR_REG_SIZE; r++)
 	{
 		writeData[r] = GetAr1010Reg(ar, r);
 	}
+	*/
 
 	ret = Ar1010On(ar);
 	if(ret < 0)
 	{
-		printf("Ar1010\r\n");
+		printf("AR1010 can't wakeup need to reset!\r\n");
 		// sem_post(ar->lock);
 		return ret;
 	}
 
+	ret = Ar1010WaitStc(ar, AR1010_STC_TIMEOUT_MS);
+	if(ret < 0)
+	{
+		printf("AR1010 can't wakeup need to reset!\r\n");
+	}
+
+	ar->onoff = 1;
+
+	/*
 	ret = Ar1010InitSequence(ar, writeData);
 	if(ret < 0)
 	{
 		printf("Ar1010\r\n");
 	}
-
-	// ar->onoff = 1;
+	*/
 
 	// sem_post(ar->lock);
 
