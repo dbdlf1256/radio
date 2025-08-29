@@ -31,7 +31,7 @@ unsigned short ar1010DefaultRegValIn[AR1010_WR_REG_SIZE] = {
 	0x82C6, // R10: 1000 0010 1100 0110 seek_wrap: reset
 	0x4E55, // R11: 0100 1110 0101 0101 hilo_side: reset, hiloctrl_b1: set, hiloctrl_b2: set
 	0x970C, // R12
-	0xB845, // R13: 1011 1000 0100 0101 GPIO3: 00, GPIO2 01, GPIO1 01
+	0xB84A, // R13: 1011 1000 0100 0101 GPIO3: 00, GPIO2 01, GPIO1 01(기존) -> 1011 1000 0100 1010 GPIO2 10, GPIO1 10(변경)
 	0xFC2D, // R14: 1111 1100 0010 1101 VOLUME2: 1111
 	0x8097, // R15: 1000 0000 1001 0111 
 	0x04A1, // R16
@@ -52,7 +52,7 @@ unsigned short ar1010DefaultRegValEx[AR1010_WR_REG_SIZE] = {
 	0x82C6, // R10: 1000 0010 1100 0110 seek_wrap: reset
 	0x4F55, // R11: 0100 1111 0101 0101 hilo_side: reset, hiloctrl_b1: set, hiloctrl_b2: set
 	0x970C, // R12 
-	0xB845, // R13: 1011 1000 0100 0101 GPIO3 00, GPIO2 01, GPIO1 01
+	0xB84A, // R13: 1011 1000 0100 0101 GPIO3 00, GPIO2 01, GPIO1 01(기존) -> 1011 1000 0100 1010 GPIO2 10, GPIO1 10(변경)
 	0xFC2D, // R14: 1111 1100 0010 1101 VOLUME2: 1111
 	0x8097, // R15: 1000 0000 1001 0111
 	0x04A1, // R16
@@ -114,16 +114,14 @@ int InitAr1010Dev(ar1010_dev_t* ar, sem_t* sem)
 	*/
 
 	ar->lock = sem;
-	sem_init(ar->lock, 0, 0);
+	sem_init(ar->lock, 0, 1);
 	memset(ar->reg, 0, AR1010_RD_REG_SIZE * 2);
 	ar->onoff = 1;
 
-	sem_post(ar->lock);
-	
 	return AR1010_OK;
 }
 
-int GetAr1010Reg(ar1010_dev_t* ar, uint8_t reg)
+uint16_t GetAr1010Reg(ar1010_dev_t* ar, uint8_t reg)
 {
 	/*
 	if(ar == NULL)
@@ -833,6 +831,8 @@ int Ar1010ChannelSet(ar1010_dev_t* ar, uint16_t chan)
 	}
 	*/
 
+	printf("Ar1010ChannelSet Function receive a %04X CHAN value\r\n", chan);
+
 	int ret = AR1010_OK;
 	
 	uint16_t r2 = GetAr1010Reg(ar, AR1010_REG2);
@@ -1310,7 +1310,7 @@ int SetAr1010VolumeStep(ar1010_dev_t* ar, int step)
 		return AR1010_EINVAL;
 	}
 
-	sem_wait(ar->lock);
+	// sem_wait(ar->lock);
 
 	int ret = AR1010_OK;
 
@@ -1324,7 +1324,7 @@ int SetAr1010VolumeStep(ar1010_dev_t* ar, int step)
 	if(ret < 0)
 		printf("SetAr1010VolumeStep function fail!\r\n");
 
-	sem_post(ar->lock);
+	// sem_post(ar->lock);
 
 	return ret;
 }
@@ -1482,6 +1482,7 @@ int Ar1010HiloTune(ar1010_dev_t* ar, double freq)
 	}
 
 	uint16_t chan = AR1010_FREQ2CHAN(freq);
+	printf("AR1010 Make Channel value: %04X\r\n", chan);
 
 	// Set HMUTE Bit
 	ret = Ar1010HmuteEnable(ar, 1);
@@ -1795,7 +1796,7 @@ int Ar1010HiloSeek(ar1010_dev_t* ar)
 	uint16_t chan = 0;
 	uint16_t rx = 0;
 
-	sem_wait(ar->lock);
+	// sem_wait(ar->lock);
 
 	// Set HMUTE Bit
 	ret = Ar1010HmuteEnable(ar, 1);
