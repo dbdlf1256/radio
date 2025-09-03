@@ -15,6 +15,28 @@ ar1010_dev_t ar1010Ch2;
 sem_t ar1010Ch1_sem;
 sem_t ar1010Ch2_sem;
 
+/*
+// 레지스터 초기값
+Reg0 = 0xFFFE  // R0: 1111 1111 1111 1110 xo_en: 1, ENABLE: 0
+Reg1 = 0xC17F  // R1: 1100 0001 0111 1111 stc_int_en: 1, deemp: 1, mono: 1, smute: 1, hmute: 1
+Reg2 = 0xCC00  // R2: 1100 1100 0000 0000 TUNE: 0, CHAN: 0 0000 0000
+Reg3 = 0x8000  // R3: 1000 0000 0000 0000 SEEKUP: 1, SEEK: 0, SPACE: 0, BAND: 00, VOLUME: 0000, SEEKTH: 000 0000
+Reg4 = 0xC400  // R4: 1100 0100 0000 0000 
+Reg5 = 0x28AA  // R5: 0010 1000 1010 1010
+Reg6 = 0x4000  // R6: 0100 0000 0000 0000
+Reg7 = 0x1C00  // R7: 0001 1100 0000 0000
+Reg8 = 0x0140  // R8: 0000 0001 0100 0000
+Reg9 = 0x007D  // R9: 0000 0000 0111 1101
+Reg10 = 0x8182 // R10: 1000 0001 1000 0010 seek_wrap: 0
+Reg11 = 0x0048 // R11: 0000 0000 0100 1000 hilo_side: 0, hiloctrl_b1: 0, hiloctrl_b2: 0
+Reg12 = 0xB500 // R12: 1011 0101 0000 0000
+Reg13 = 0x8A40 // R13: 1000 1010 0100 0000 GPIO3: 00, GPIO2: 00, GPIO1: 00
+Reg14 = 0x0418 // R14: 0000 0100 0010 1000 VOLUME2: 0000
+Reg15 = 0x8088 // R15: 1000 0000 1000 1000
+Reg16 = 0x0440 // R16: 0000 0100 0100 0000
+Reg17 = 0xA003 // R17: 1010 0000 0000 0011
+*/
+
 // AR1010 Default Register Value
 //const unsigned short ar1010DefaultRegValIn[AR1010_WR_REG_SIZE] = {
 unsigned short ar1010DefaultRegValIn[AR1010_WR_REG_SIZE] = {
@@ -280,6 +302,8 @@ int Ar1010Write(ar1010_dev_t* ar, const uint8_t reg, uint16_t* value, uint32_t v
 		return ret;
 	}
 
+	memset(writeData, 0, writeLength);
+
 	writeData[0] = reg;
 	int i;
 	for(i = 1; i < writeLength; i += 2)
@@ -342,6 +366,9 @@ int Ar1010Read(ar1010_dev_t* ar, const uint8_t reg, uint32_t readLength)
 
 		return ret;
 	}
+
+	memset(readData, 0, readDataLength);
+	memset(unpackData, 0, readDataLength);
 
 	ret = iic_read_reg(AR1010_ADDR, reg, readData, readDataLength);
 	if(ret < 0)
